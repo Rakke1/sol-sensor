@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+dist/
+target/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Keypairs (sensitive)
+keys/
+*.json.bak
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
