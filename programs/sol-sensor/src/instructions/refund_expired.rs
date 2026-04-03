@@ -4,7 +4,7 @@ use anchor_spl::token_interface::{self, Mint, TokenAccount, TransferChecked};
 
 use crate::{
     errors::SolSensorError,
-    state::{HardwareEntry, QueryReceipt, SensorPool, SPLIT_HARDWARE_BPS, SPLIT_POOL_BPS},
+    state::{HardwareEntry, QueryReceipt, SensorPool, SPLIT_POOL_BPS},
 };
 
 /// Accounts required to refund an expired QueryReceipt.
