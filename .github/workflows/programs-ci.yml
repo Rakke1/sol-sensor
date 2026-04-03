@@ -33,6 +33,11 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSfL https://solana-install.solana.workers.dev | bash
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
+      - name: Generate default wallet
+        run: |
+          mkdir -p ~/.config/solana
+          solana-keygen new --no-passphrase -o ~/.config/solana/id.json
+
       - name: Install Anchor CLI
         run: |
           cargo install --git https://github.com/coral-xyz/anchor --tag v0.32.0 anchor-cli --locked
