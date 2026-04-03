@@ -1,0 +1,13 @@
+[workspace]
+members = ["sol-sensor"]
+resolver = "2"
+
+[profile.release]
+overflow-checks = true
+lto = "thin"
+opt-level = 3
+incremental = false
+codegen-units = 1
+
+[profile.test.package.sol-sensor]
+opt-level = 3
