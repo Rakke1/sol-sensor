@@ -4,7 +4,7 @@ use anchor_spl::token_interface::{self, Mint, TokenAccount, TransferChecked};
 
 use crate::{
     errors::SolSensorError,
-    state::{HardwareEntry, QueryReceipt, SensorPool, SPLIT_POOL_BPS},
+    state::{HardwareEntry, QueryReceipt, SensorPool},
 };
 
 /// Accounts required to refund an expired QueryReceipt.
@@ -77,13 +77,7 @@ pub fn handler(ctx: Context<RefundExpiredReceipt>, _nonce: [u8; 32]) -> Result<(
         SolSensorError::ReceiptNotExpired
     );
 
-    let amount = ctx.accounts.query_receipt.amount;
-
-    // Calculate the 80 % pool share to refund.
-    let pool_share = amount
-        .checked_mul(SPLIT_POOL_BPS as u64)
-        .and_then(|v| v.checked_div(10_000))
-        .ok_or(SolSensorError::ArithmeticOverflow)?;
+    let pool_share = ctx.accounts.query_receipt.pool_share;
 
     // Transfer pool share back to payer, signed by sensor_pool PDA.
     let seeds: &[&[u8]] = &[SensorPool::SEEDS, &[ctx.accounts.sensor_pool.bump]];
@@ -103,11 +97,30 @@ pub fn handler(ctx: Context<RefundExpiredReceipt>, _nonce: [u8; 32]) -> Result<(
     let decimals = ctx.accounts.usdc_mint.decimals;
     token_interface::transfer_checked(cpi_ctx, pool_share, decimals)?;
 
-    // Reverse the pool's total_distributed counter.
+    // Reverse the pool's total_distributed counter and reward accumulator.
     let sensor_pool = &mut ctx.accounts.sensor_pool;
     sensor_pool.total_distributed = sensor_pool
         .total_distributed
         .saturating_sub(pool_share);
+
+    let total_supply_at_payment = ctx.accounts.query_receipt.total_supply_at_payment;
+    if total_supply_at_payment > 0 {
+        use crate::state::sensor_pool::PRECISION_FACTOR;
+        let reverse_increment = (pool_share as u128)
+            .checked_mul(PRECISION_FACTOR)
+            .and_then(|v| v.checked_div(total_supply_at_payment as u128))
+            .ok_or(SolSensorError::ArithmeticOverflow)?;
+
+        sensor_pool.reward_per_token = sensor_pool
+            .reward_per_token
+            .saturating_sub(reverse_increment);
+
+        msg!(
+            "reward_per_token reversed: {} -> {}",
+            sensor_pool.reward_per_token.checked_add(reverse_increment).unwrap_or(0),
+            sensor_pool.reward_per_token
+        );
+    }
 
     msg!(
         "receipt_refunded: payer={}, pool_refund={}",

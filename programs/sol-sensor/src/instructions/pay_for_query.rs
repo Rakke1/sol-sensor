@@ -150,6 +150,8 @@ pub fn handler(ctx: Context<PayForQuery>, _nonce: [u8; 32], amount: u64) -> Resu
     query_receipt.sensor_id = ctx.accounts.hardware_entry.sensor_pubkey;
     query_receipt.payer = ctx.accounts.payer.key();
     query_receipt.amount = amount;
+    query_receipt.pool_share = pool_share;
+    query_receipt.total_supply_at_payment = sensor_pool.total_supply;
     query_receipt.consumed = false;
     query_receipt.created_at = clock.unix_timestamp;
     query_receipt.expiry_slot = clock

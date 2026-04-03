@@ -116,6 +116,8 @@ mod tests {
             sensor_id: Default::default(),
             payer: Default::default(),
             amount: 50_000,
+            pool_share: 40_000,
+            total_supply_at_payment: 1_000_000,
             consumed: false,
             created_at: 0,
             expiry_slot: 100,
@@ -265,6 +267,44 @@ mod tests {
         assert_eq!(SensorPool::LEN, 8 + 32 + 32 + 16 + 8 + 4 + 8 + 8 + 1); // 117
         assert_eq!(HardwareEntry::LEN, 8 + 32 + 32 + 1 + 1 + 8 + 8 + 1);   // 91
         assert_eq!(ContributorState::LEN, 8 + 32 + 16 + 8 + 1);              // 65
-        assert_eq!(QueryReceipt::LEN, 8 + 32 + 32 + 8 + 1 + 8 + 8 + 1);     // 98
+        assert_eq!(QueryReceipt::LEN, 8 + 32 + 32 + 8 + 8 + 8 + 1 + 8 + 8 + 1); // 114
+    }
+
+    #[test]
+    fn refund_reverses_reward_increment() {
+        use sol_sensor::state::sensor_pool::PRECISION_FACTOR;
+        let mut pool = SensorPool {
+            total_supply: 1_000,
+            reward_per_token: 5 * PRECISION_FACTOR,
+            ..Default::default()
+        };
+
+        let pool_share: u64 = 50_000;
+        let total_supply_at_p: u64 = 1_000;
+
+        // Simulate increment in pay_for_query
+        let increment = (pool_share as u128)
+            .checked_mul(PRECISION_FACTOR)
+            .unwrap()
+            .checked_div(total_supply_at_p as u128)
+            .unwrap();
+        
+        let rpt_before = pool.reward_per_token;
+        pool.reward_per_token += increment;
+        assert!(pool.reward_per_token > rpt_before);
+
+        // Simulate reversal in refund_expired
+        let reverse_increment = (pool_share as u128)
+            .checked_mul(PRECISION_FACTOR)
+            .unwrap()
+            .checked_div(total_supply_at_p as u128)
+            .unwrap();
+        
+        pool.reward_per_token = pool.reward_per_token.saturating_sub(reverse_increment);
+
+        assert_eq!(
+            pool.reward_per_token, rpt_before,
+            "reward_per_token must return to original state after reversal"
+        );
     }
 }
