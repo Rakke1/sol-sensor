@@ -22,8 +22,9 @@ spl-transfer-hook-interface = "0.9.0"
 spl-tlv-account-resolution = "0.9.0"
 
 [dev-dependencies]
-mollusk-svm = "0.3.0"
-litesvm = "0.6.0"
-spl-token = { version = "6", features = ["no-entrypoint"] }
+# mollusk-svm and litesvm are deferred: both 0.3.x require Solana 2.2.x / edition-2024
+# crates which conflict with Rust 1.81.0 + anchor-lang 0.32.x (Solana 2.1.x).
+# Re-add once a version compatible with this toolchain is identified.
+# Unit tests in tests/unit_tests.rs use only native #[cfg(test)] — no framework needed.
 
 [build-dependencies]
