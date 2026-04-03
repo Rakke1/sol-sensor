@@ -1,0 +1,44 @@
+name: Programs CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'programs/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'programs/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Cache Solana and Anchor
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/solana*
+            ~/.cargo/bin/anchor
+            ~/.local/share/solana
+          key: ${{ runner.os }}-solana-2.1.0-anchor-0.32.0
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v2.1.0/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor --tag v0.32.0 anchor-cli --locked
+
+      - name: Build and Test Programs
+        working-directory: programs
+        run: |
+          anchor build
+          anchor test
