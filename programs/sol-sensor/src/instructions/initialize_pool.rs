@@ -78,7 +78,7 @@ pub struct InitializePool<'info> {
     #[account(
         init,
         payer = admin,
-        space = 8 + 32 + 32, // Discriminator + Mint Pubkey + extra meta
+        space = ExtraAccountMetaList::size_of(3).unwrap(),
         seeds = [b"extra-account-metas", mint.key().as_ref()],
         bump
     )]
@@ -118,17 +118,49 @@ pub fn handler(ctx: Context<InitializePool>, max_supply: u64) -> Result<()> {
     sensor_pool.max_supply = max_supply;
     sensor_pool.bump = ctx.bumps.sensor_pool;
 
-    // Initialize the ExtraAccountMetaList
+    // Initialize the ExtraAccountMetaList with 3 accounts:
+    // 1. sensor_pool (Literal "pool")
+    // 2. sender_contributor ("contrib" + source_token.owner)
+    // 3. receiver_contributor ("contrib" + destination_token.owner)
     let account_metas = vec![
+        // Index 5: sensor_pool
+        ExtraAccountMeta::new_with_seeds(
+            &[Seed::Literal {
+                bytes: b"pool".to_vec(),
+            }],
+            false, // is_signer
+            true,  // is_writable
+        ).unwrap(),
+        // Index 6: sender_contributor
         ExtraAccountMeta::new_with_seeds(
             &[
                 Seed::Literal {
-                    bytes: b"sensor_pool".to_vec(),
+                    bytes: b"contrib".to_vec(),
+                },
+                Seed::AccountData {
+                    account_index: 0, // source_token
+                    data_index: 32,   // owner offset
+                    length: 32,
                 },
             ],
             false,
-            true, // Is Writable
-        ).unwrap()
+            true,
+        ).unwrap(),
+        // Index 7: receiver_contributor
+        ExtraAccountMeta::new_with_seeds(
+            &[
+                Seed::Literal {
+                    bytes: b"contrib".to_vec(),
+                },
+                Seed::AccountData {
+                    account_index: 2, // destination_token
+                    data_index: 32,   // owner offset
+                    length: 32,
+                },
+            ],
+            false,
+            true,
+        ).unwrap(),
     ];
 
     let account_info = ctx.accounts.extra_account_meta_list.to_account_info();
