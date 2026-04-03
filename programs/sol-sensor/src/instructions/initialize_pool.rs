@@ -4,7 +4,10 @@ use anchor_spl::{
     token_2022::Token2022,
 };
 
-use crate::state::{GlobalState, SensorPool};
+use crate::{
+    errors::SolSensorError,
+    state::{GlobalState, SensorPool, MAX_POOL_SUPPLY},
+};
 
 /// Accounts required to initialise the SolSensor protocol.
 ///
@@ -63,8 +66,14 @@ pub struct InitializePool<'info> {
 /// Initialise the SolSensor protocol.
 ///
 /// # Parameters
-/// * `max_supply` — hard cap on pool token supply (must be ≤ [`MAX_POOL_SUPPLY`]).
+/// * `max_supply` — hard cap on pool token supply (must be > 0 and ≤ [`MAX_POOL_SUPPLY`]).
 pub fn handler(ctx: Context<InitializePool>, max_supply: u64) -> Result<()> {
+    // Validate supply cap before touching any state.
+    require!(
+        max_supply > 0 && max_supply <= MAX_POOL_SUPPLY,
+        SolSensorError::SupplyCapExceeded
+    );
+
     let global_state = &mut ctx.accounts.global_state;
     global_state.admin = ctx.accounts.admin.key();
     global_state.consume_authority = ctx.accounts.admin.key(); // updated post-deploy
@@ -82,5 +91,12 @@ pub fn handler(ctx: Context<InitializePool>, max_supply: u64) -> Result<()> {
     sensor_pool.max_supply = max_supply;
     sensor_pool.bump = ctx.bumps.sensor_pool;
 
+    msg!(
+        "pool_initialised: admin={}, max_supply={}",
+        ctx.accounts.admin.key(),
+        max_supply
+    );
+
     Ok(())
 }
+

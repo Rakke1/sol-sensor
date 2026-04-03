@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::Token2022;
-use anchor_spl::token_interface::{Mint, TokenAccount};
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TransferChecked};
 
 use crate::{
     errors::SolSensorError,
@@ -26,7 +26,7 @@ pub struct PayForQuery<'info> {
     #[account(mut, seeds = [SensorPool::SEEDS], bump = sensor_pool.bump)]
     pub sensor_pool: Account<'info, SensorPool>,
 
-    /// On-chain record of the sensor being queried.
+    /// On-chain record of the sensor being queried — must be active.
     #[account(
         seeds = [HardwareEntry::SEEDS_PREFIX, hardware_entry.sensor_pubkey.as_ref()],
         bump = hardware_entry.bump,
@@ -46,7 +46,7 @@ pub struct PayForQuery<'info> {
     #[account(mut, address = sensor_pool.vault)]
     pub pool_vault: InterfaceAccount<'info, TokenAccount>,
 
-    /// USDC mint.
+    /// USDC mint — needed for `transfer_checked`.
     pub usdc_mint: InterfaceAccount<'info, Mint>,
 
     /// Ephemeral payment receipt PDA (created here, closed on consumption).
@@ -71,6 +71,9 @@ pub struct PayForQuery<'info> {
 pub fn handler(ctx: Context<PayForQuery>, _nonce: [u8; 32], amount: u64) -> Result<()> {
     let clock = &ctx.accounts.clock;
 
+    // Validate amount is non-zero (enforces minimum payment).
+    require!(amount > 0, SolSensorError::InsufficientPayment);
+
     // Calculate the revenue split.
     let hardware_share = amount
         .checked_mul(SPLIT_HARDWARE_BPS as u64)
@@ -82,7 +85,33 @@ pub fn handler(ctx: Context<PayForQuery>, _nonce: [u8; 32], amount: u64) -> Resu
         .and_then(|v| v.checked_div(10_000))
         .ok_or(SolSensorError::ArithmeticOverflow)?;
 
-    // Update the reward-per-token accumulator with the pool's share.
+    let usdc_decimals = ctx.accounts.usdc_mint.decimals;
+
+    // 1. Transfer 20 % to the hardware owner.
+    let hw_transfer = CpiContext::new(
+        ctx.accounts.token_program.to_account_info(),
+        TransferChecked {
+            from: ctx.accounts.payer_usdc.to_account_info(),
+            mint: ctx.accounts.usdc_mint.to_account_info(),
+            to: ctx.accounts.hardware_owner_usdc.to_account_info(),
+            authority: ctx.accounts.payer.to_account_info(),
+        },
+    );
+    token_interface::transfer_checked(hw_transfer, hardware_share, usdc_decimals)?;
+
+    // 2. Transfer 80 % to the pool vault.
+    let vault_transfer = CpiContext::new(
+        ctx.accounts.token_program.to_account_info(),
+        TransferChecked {
+            from: ctx.accounts.payer_usdc.to_account_info(),
+            mint: ctx.accounts.usdc_mint.to_account_info(),
+            to: ctx.accounts.pool_vault.to_account_info(),
+            authority: ctx.accounts.payer.to_account_info(),
+        },
+    );
+    token_interface::transfer_checked(vault_transfer, pool_share, usdc_decimals)?;
+
+    // 3. Update the reward-per-token accumulator with the pool's share.
     let sensor_pool = &mut ctx.accounts.sensor_pool;
     if sensor_pool.total_supply > 0 {
         use crate::state::sensor_pool::PRECISION_FACTOR;
@@ -91,10 +120,17 @@ pub fn handler(ctx: Context<PayForQuery>, _nonce: [u8; 32], amount: u64) -> Resu
             .and_then(|v| v.checked_div(sensor_pool.total_supply as u128))
             .ok_or(SolSensorError::ArithmeticOverflow)?;
 
+        let old_rpt = sensor_pool.reward_per_token;
         sensor_pool.reward_per_token = sensor_pool
             .reward_per_token
             .checked_add(increment)
             .ok_or(SolSensorError::ArithmeticOverflow)?;
+
+        msg!(
+            "reward_per_token updated: {} -> {}",
+            old_rpt,
+            sensor_pool.reward_per_token
+        );
     }
 
     sensor_pool.total_distributed = sensor_pool
@@ -102,14 +138,14 @@ pub fn handler(ctx: Context<PayForQuery>, _nonce: [u8; 32], amount: u64) -> Resu
         .checked_add(pool_share)
         .ok_or(SolSensorError::ArithmeticOverflow)?;
 
-    // Increment global query counter.
+    // 4. Increment global query counter.
     let global_state = &mut ctx.accounts.global_state;
     global_state.total_queries = global_state
         .total_queries
         .checked_add(1)
         .ok_or(SolSensorError::ArithmeticOverflow)?;
 
-    // Write the receipt.
+    // 5. Write the receipt.
     let query_receipt = &mut ctx.accounts.query_receipt;
     query_receipt.sensor_id = ctx.accounts.hardware_entry.sensor_pubkey;
     query_receipt.payer = ctx.accounts.payer.key();
@@ -122,8 +158,13 @@ pub fn handler(ctx: Context<PayForQuery>, _nonce: [u8; 32], amount: u64) -> Resu
         .ok_or(SolSensorError::ArithmeticOverflow)?;
     query_receipt.bump = ctx.bumps.query_receipt;
 
-    let _ = hardware_share; // CPI transfers handled by caller via Anchor SPL helpers
-    let _ = pool_share;
+    msg!(
+        "pay_for_query: sensor={}, amount={}, hw_share={}, pool_share={}",
+        ctx.accounts.hardware_entry.sensor_pubkey,
+        amount,
+        hardware_share,
+        pool_share
+    );
 
     Ok(())
 }

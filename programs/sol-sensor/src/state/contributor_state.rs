@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::errors::SolSensorError;
 use crate::state::sensor_pool::PRECISION_FACTOR;
 
 /// Per-holder reward tracking state.
@@ -38,12 +39,12 @@ impl ContributorState {
     ) -> Result<u64> {
         let delta = current_reward_per_token
             .checked_sub(self.reward_per_token_paid)
-            .ok_or(anchor_lang::error::ErrorCode::AccountNotEnoughKeys)?;
+            .ok_or(error!(SolSensorError::ArithmeticOverflow))?;
 
         let pending = (token_balance as u128)
             .checked_mul(delta)
             .and_then(|v| v.checked_div(PRECISION_FACTOR))
-            .ok_or(anchor_lang::error::ErrorCode::AccountNotEnoughKeys)?;
+            .ok_or(error!(SolSensorError::ArithmeticOverflow))?;
 
         Ok(pending as u64)
     }

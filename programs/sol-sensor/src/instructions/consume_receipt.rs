@@ -7,6 +7,7 @@ use crate::{
 
 /// Accounts required to consume a QueryReceipt.
 #[derive(Accounts)]
+#[instruction(nonce: [u8; 32])]
 pub struct ConsumeReceipt<'info> {
     /// The API co-signer — must match `global_state.consume_authority`.
     pub consume_authority: Signer<'info>,
@@ -21,9 +22,10 @@ pub struct ConsumeReceipt<'info> {
     pub global_state: Account<'info, GlobalState>,
 
     /// The payment receipt PDA to consume and close.
+    /// Seeds: ["receipt", nonce] — same seeds used in pay_for_query.
     #[account(
         mut,
-        seeds = [QueryReceipt::SEEDS_PREFIX, &query_receipt.to_account_info().key().to_bytes()],
+        seeds = [QueryReceipt::SEEDS_PREFIX, &nonce],
         bump = query_receipt.bump,
         constraint = !query_receipt.consumed @ SolSensorError::ReceiptAlreadyConsumed,
         close = payer,
@@ -42,15 +44,24 @@ pub struct ConsumeReceipt<'info> {
 /// Mark a QueryReceipt as consumed and close the PDA (refunding rent to the payer).
 ///
 /// Only the designated `consume_authority` (the API co-signer) can call this.
-pub fn handler(ctx: Context<ConsumeReceipt>) -> Result<()> {
+/// The receipt must not be expired — callers should check the slot before calling.
+pub fn handler(ctx: Context<ConsumeReceipt>, _nonce: [u8; 32]) -> Result<()> {
     let clock = &ctx.accounts.clock;
     let query_receipt = &mut ctx.accounts.query_receipt;
 
+    // Reject expired receipts — the payer should use refund_expired_receipt instead.
     require!(
         query_receipt.is_valid(clock.slot),
         SolSensorError::ReceiptExpired
     );
 
     query_receipt.consumed = true;
+
+    msg!(
+        "receipt_consumed: receipt={}, payer={}",
+        ctx.accounts.query_receipt.key(),
+        ctx.accounts.payer.key()
+    );
+
     Ok(())
 }

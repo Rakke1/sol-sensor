@@ -46,14 +46,14 @@ pub mod sol_sensor {
 
     /// Called by the API co-signer after serving the sensor data.  Marks the
     /// QueryReceipt as consumed and closes the PDA, refunding rent to the payer.
-    pub fn consume_receipt(ctx: Context<ConsumeReceipt>) -> Result<()> {
-        instructions::consume_receipt::handler(ctx)
+    pub fn consume_receipt(ctx: Context<ConsumeReceipt>, nonce: [u8; 32]) -> Result<()> {
+        instructions::consume_receipt::handler(ctx, nonce)
     }
 
     /// Refund an expired, unconsumed QueryReceipt to the original payer.
-    /// Reverses the 20/80 revenue split and closes the PDA.
-    pub fn refund_expired_receipt(ctx: Context<RefundExpiredReceipt>) -> Result<()> {
-        instructions::refund_expired::handler(ctx)
+    /// Reverses the 80 % pool-vault share and closes the PDA.
+    pub fn refund_expired_receipt(ctx: Context<RefundExpiredReceipt>, nonce: [u8; 32]) -> Result<()> {
+        instructions::refund_expired::handler(ctx, nonce)
     }
 
     /// Claim accumulated USDC rewards proportional to the caller's pool token

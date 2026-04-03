@@ -23,3 +23,7 @@ keys/
 .DS_Store
 Thumbs.db
 
+programs/.rtk/filters.toml
+programs/CLAUDE.md
+programs/.clinerules
+programs/.github/*
