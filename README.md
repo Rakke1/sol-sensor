@@ -1,19 +1,27 @@
-<p align="center">
+<p height=15 align="center">
   <a href="https://github.com/Rakke1/sol-sensor/actions/workflows/programs-ci.yml">
     <img src="https://github.com/Rakke1/sol-sensor/actions/workflows/programs-ci.yml/badge.svg" alt="Programs CI"/>
   </a>
-  <img src="https://img.shields.io/badge/Solana-Devnet-14F195?style=for-the-badge&logo=solana&logoColor=white" alt="Solana Devnet"/>
-  <img src="https://img.shields.io/badge/Token--2022-Transfer%20Hook-9945FF?style=for-the-badge" alt="Token-2022"/>
-  <img src="https://img.shields.io/badge/HTTP-402%20Payments-4a9eff?style=for-the-badge" alt="HTTP 402"/>
-  <img src="https://img.shields.io/badge/%40solana%2Fkit-v6-3178C6?style=for-the-badge" alt="Solana Kit"/>
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License"/>
+  <img height=15 src="https://img.shields.io/badge/Solana-Devnet-14F195?style=for-the-badge&logo=solana&logoColor=white" alt="Solana Devnet"/>
+  <img height=15 src="https://img.shields.io/badge/Colosseum-2026-3178C6?style=for-the-badge" alt="Hackathon"/>
+  <img height=15 src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License"/>
 </p>
+
 
 # SolSensor
 
 **Tokenized IoT Sensor Pools × HTTP 402 Machine-to-Machine Micro-Payments on Solana**
 
 > A DePIN protocol that pools real-world air quality sensors into a single tokenized network, then monetizes their data through HTTP 402 micro-payments — with atomic on-chain revenue splitting and trustless reward distribution.
+
+---
+
+## Submission to 2026 Solana National Hackathon
+
+| Name            | Role                  | Contact                                                      |
+|-----------------|----------------------|--------------------------------------------------------------|
+| Ivan Tag | Founder & Lead Engineer | [Telegram](https://t.me/yeiazel) |
+| Artem Molchanov | Founder & Lead Engineer | [Telegram](https://t.me/var_molchanov) |
 
 ---
 
@@ -35,7 +43,13 @@ Today's IoT data market is broken in two ways:
 
 Every data response includes an **Ed25519 signature** from the source sensor, enabling clients to independently verify data authenticity without trusting the API.
 
----
+
+## Why Solana?
+
+- **Speed** — 400 ms block times enable real-time micro-payments and low-latency IoT data delivery; no other L1 makes this feasible for our 50–100 ms latency target.
+- **Cost** — Ultra-low fees (≈$0.00025 per transaction) make high-frequency machine-to-machine payments and data submissions economically viable at scale.
+- **Ecosystem** — Solana’s deep DeFi liquidity and active developer community provide immediate integrations, demand, and tooling for tokenized infrastructure projects.
+- **Composability** — Anchor’s CPI and Solana’s native support for advanced token standards (Token-2022, Transfer Hooks) allow seamless integration with existing protocols and programmable, atomic revenue logic.
 
 ## Architecture
 
