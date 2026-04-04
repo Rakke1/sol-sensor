@@ -1,3 +1,6 @@
+#![allow(unexpected_cfgs)]
+#![allow(ambiguous_glob_reexports)]
+
 use anchor_lang::prelude::*;
 
 pub mod errors;
@@ -6,7 +9,7 @@ pub mod state;
 
 pub use instructions::*;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("ETu1YLCnZyeeWBYYLSFXLNncJa4AgaHaZQ8JSUxTEosJ");
 
 #[program]
 pub mod sol_sensor {

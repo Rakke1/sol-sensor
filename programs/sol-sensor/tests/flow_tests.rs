@@ -3,11 +3,13 @@
 //! These tests use `litesvm` to run multi-instruction sequences in-process
 //! (no validator needed) and verify end-to-end state transitions.
 //!
-//! Run with:
-//!   cargo test --test flow_tests
+//! **Status: deferred — `litesvm` ≥0.5 targets Solana 2.2.x which conflicts with
+//! `anchor-lang 0.32.x` (Solana 2.1.x).  Re-enable once a 2.1.x-compatible
+//! version ships, or when the workspace upgrades to Anchor 0.33.x / Solana 2.2.x.**
 //!
-//! NOTE: LiteSVM tests require the compiled `.so` at `target/deploy/sol_sensor.so`.
-//! Run `NO_DNA=1 anchor build` before running these tests.
+//! To run:
+//!   cargo test --test flow_tests -- --include-ignored
+
 
 // ---------------------------------------------------------------------------
 // Placeholder: LiteSVM flow tests

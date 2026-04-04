@@ -16,6 +16,10 @@ pub struct QueryReceipt {
     pub payer: Pubkey,
     /// Amount paid in USDC micro-units.
     pub amount: u64,
+    /// The pool's 80 % share of the amount (USDC micro-units).
+    pub pool_share: u64,
+    /// Total supply of pool tokens at the time of payment.
+    pub total_supply_at_payment: u64,
     /// Whether the receipt has already been consumed by the API co-signer.
     pub consumed: bool,
     /// Unix timestamp at the time of payment.
@@ -28,8 +32,9 @@ pub struct QueryReceipt {
 
 impl QueryReceipt {
     /// Anchor discriminator (8) + sensor_id (32) + payer (32) + amount (8) +
-    /// consumed (1) + created_at (8) + expiry_slot (8) + bump (1)
-    pub const LEN: usize = 8 + 32 + 32 + 8 + 1 + 8 + 8 + 1;
+    /// pool_share (8) + total_supply_at_payment (8) + consumed (1) + created_at (8) +
+    /// expiry_slot (8) + bump (1)
+    pub const LEN: usize = 8 + 32 + 32 + 8 + 8 + 8 + 1 + 8 + 8 + 1;
     pub const SEEDS_PREFIX: &'static [u8] = b"receipt";
 
     /// Returns `true` if the receipt can still be consumed by the API co-signer.

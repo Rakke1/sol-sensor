@@ -2,6 +2,11 @@ use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token_2022::Token2022,
+    token_interface::{Mint, TokenAccount},
+};
+use spl_transfer_hook_interface::instruction::ExecuteInstruction;
+use spl_tlv_account_resolution::{
+    account::ExtraAccountMeta, seeds::Seed, state::ExtraAccountMetaList,
 };
 
 use crate::{
@@ -44,23 +49,45 @@ pub struct InitializePool<'info> {
     )]
     pub sensor_pool: Account<'info, SensorPool>,
 
-    /// Token-2022 pool mint.  Created with a Transfer Hook extension pointing to
-    /// this program.
-    #[account(mut)]
-    pub mint: Signer<'info>,
+    /// Token-2022 pool mint. Created dynamically here.
+    #[account(
+        init,
+        payer = admin,
+        mint::decimals = 6,
+        mint::authority = sensor_pool,
+        mint::token_program = token_program,
+        extensions::transfer_hook::authority = sensor_pool,
+        extensions::transfer_hook::program_id = crate::ID,
+    )]
+    pub mint: InterfaceAccount<'info, Mint>,
 
     /// Pool vault — the ATA of the `sensor_pool` PDA for the pool mint.
-    #[account(mut)]
-    pub pool_vault: UncheckedAccount<'info>,
+    #[account(
+        init,
+        payer = admin,
+        associated_token::mint = usdc_mint,
+        associated_token::authority = sensor_pool,
+        associated_token::token_program = token_program,
+    )]
+    pub pool_vault: InterfaceAccount<'info, TokenAccount>,
+
+    pub usdc_mint: InterfaceAccount<'info, Mint>,
 
     /// ExtraAccountMetaList PDA required by the Token-2022 Transfer Hook runtime.
-    /// Seeds: `["extra-account-metas", mint.key()]` — matches the SPL standard.
-    #[account(mut)]
+    /// Seeds: `["extra-account-metas", mint.key()]`
+    #[account(
+        init,
+        payer = admin,
+        space = ExtraAccountMetaList::size_of(3).unwrap(),
+        seeds = [b"extra-account-metas", mint.key().as_ref()],
+        bump
+    )]
     pub extra_account_meta_list: UncheckedAccount<'info>,
 
+    pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token2022>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 /// Initialise the SolSensor protocol.
@@ -90,6 +117,58 @@ pub fn handler(ctx: Context<InitializePool>, max_supply: u64) -> Result<()> {
     sensor_pool.total_supply = 0;
     sensor_pool.max_supply = max_supply;
     sensor_pool.bump = ctx.bumps.sensor_pool;
+
+    // Initialize the ExtraAccountMetaList with 3 accounts:
+    // 1. sensor_pool (Literal "pool")
+    // 2. sender_contributor ("contrib" + source_token.owner)
+    // 3. receiver_contributor ("contrib" + destination_token.owner)
+    let account_metas = vec![
+        // Index 5: sensor_pool
+        ExtraAccountMeta::new_with_seeds(
+            &[Seed::Literal {
+                bytes: b"pool".to_vec(),
+            }],
+            false, // is_signer
+            true,  // is_writable
+        ).unwrap(),
+        // Index 6: sender_contributor
+        ExtraAccountMeta::new_with_seeds(
+            &[
+                Seed::Literal {
+                    bytes: b"contrib".to_vec(),
+                },
+                Seed::AccountData {
+                    account_index: 0, // source_token
+                    data_index: 32,   // owner offset
+                    length: 32,
+                },
+            ],
+            false,
+            true,
+        ).unwrap(),
+        // Index 7: receiver_contributor
+        ExtraAccountMeta::new_with_seeds(
+            &[
+                Seed::Literal {
+                    bytes: b"contrib".to_vec(),
+                },
+                Seed::AccountData {
+                    account_index: 2, // destination_token
+                    data_index: 32,   // owner offset
+                    length: 32,
+                },
+            ],
+            false,
+            true,
+        ).unwrap(),
+    ];
+
+    let account_info = ctx.accounts.extra_account_meta_list.to_account_info();
+    let mut data = account_info.try_borrow_mut_data()?;
+    ExtraAccountMetaList::init::<ExecuteInstruction>(
+        &mut data,
+        &account_metas,
+    )?;
 
     msg!(
         "pool_initialised: admin={}, max_supply={}",

@@ -1,0 +1,45 @@
+name: Programs CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'programs/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'programs/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Solana and Anchor
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/solana*
+            ~/.cargo/bin/anchor
+            ~/.local/share/solana
+          key: ${{ runner.os }}-solana-2.1.0-anchor-0.32.0
+
+      - name: Install Solana CLI
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSfL https://solana-install.solana.workers.dev | bash
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Generate default wallet
+        run: |
+          mkdir -p ~/.config/solana
+          solana-keygen new --no-passphrase -o ~/.config/solana/id.json
+
+      - name: Build and Test Programs
+        working-directory: programs
+        run: |
+          anchor build
+          anchor test

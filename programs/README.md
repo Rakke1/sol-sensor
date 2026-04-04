@@ -1,4 +1,7 @@
 <p align="center">
+  <a href="https://github.com/Rakke1/sol-sensor/actions/workflows/programs-ci.yml">
+    <img src="https://github.com/Rakke1/sol-sensor/actions/workflows/programs-ci.yml/badge.svg" alt="Programs CI"/>
+  </a>
   <img src="https://img.shields.io/badge/Anchor-0.32.x-14F195?style=for-the-badge" alt="Anchor 0.32"/>
   <img src="https://img.shields.io/badge/Rust-1.81.0-CE422B?style=for-the-badge&logo=rust&logoColor=white" alt="Rust"/>
   <img src="https://img.shields.io/badge/Solana-2.1.x%20devnet-9945FF?style=for-the-badge&logo=solana&logoColor=white" alt="Solana 2.1"/>

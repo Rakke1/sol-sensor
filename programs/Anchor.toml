@@ -1,13 +1,13 @@
-[toolchain]
-anchor_version = "0.32.0"
-solana_version = "2.1.0"
+# [toolchain]
+# anchor_version = "0.32.0"
+# solana_version = "2.1.0"
 
 [features]
 seeds = true
 skip-lint = false
 
 [programs.devnet]
-sol_sensor = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+sol_sensor = "ETu1YLCnZyeeWBYYLSFXLNncJa4AgaHaZQ8JSUxTEosJ"
 
 [registry]
 url = "https://api.apr.dev"
@@ -17,4 +17,4 @@ cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "cargo test-sbf --manifest-path=programs/sol-sensor/Cargo.toml"
+test = "cargo test-sbf --manifest-path=sol-sensor/Cargo.toml"
