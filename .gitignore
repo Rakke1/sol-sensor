@@ -23,7 +23,12 @@ keys/
 .DS_Store
 Thumbs.db
 
+.agents/
+
 programs/.rtk/filters.toml
 programs/CLAUDE.md
 programs/.clinerules
 programs/.github/*
+programs/test-ledger/
+programs/.anchor/
+programs/spl_token_2022.so

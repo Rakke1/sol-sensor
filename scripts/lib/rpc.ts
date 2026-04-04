@@ -14,12 +14,23 @@ const DEVNET_GENESIS_HASH = 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG';
 const DEVNET_RPC_URL = 'https://api.devnet.solana.com';
 const DEVNET_WSS_URL = 'wss://api.devnet.solana.com';
 
+const LOCALNET_RPC_URL = 'http://localhost:8899';
+const LOCALNET_WSS_URL = 'ws://localhost:8900';
+
 export function createRpc(url?: string): Rpc<SolanaRpcApi> {
   return createSolanaRpc(url ?? DEVNET_RPC_URL);
 }
 
+export function createLocalnetRpc(url?: string): Rpc<SolanaRpcApi> {
+  return createSolanaRpc(url ?? LOCALNET_RPC_URL);
+}
+
 export function createRpcSubscriptions(url?: string): RpcSubscriptions<SolanaRpcSubscriptionsApi> {
   return createSolanaRpcSubscriptions(url ?? DEVNET_WSS_URL);
+}
+
+export function createLocalnetRpcSubscriptions(url?: string): RpcSubscriptions<SolanaRpcSubscriptionsApi> {
+  return createSolanaRpcSubscriptions(url ?? LOCALNET_WSS_URL);
 }
 
 export async function assertDevnet(rpc: Rpc<SolanaRpcApi>): Promise<void> {
@@ -27,6 +38,17 @@ export async function assertDevnet(rpc: Rpc<SolanaRpcApi>): Promise<void> {
   if (genesisHash !== DEVNET_GENESIS_HASH) {
     throw new Error(
       `This script only works on devnet. Got genesis hash: ${genesisHash} (expected ${DEVNET_GENESIS_HASH})`,
+    );
+  }
+}
+
+export async function assertLocalnet(rpc: Rpc<SolanaRpcApi>): Promise<void> {
+  try {
+    await rpc.getGenesisHash().send();
+    // Any successful response means we're connected to localnet
+  } catch (err) {
+    throw new Error(
+      `Cannot connect to localnet at http://localhost:8899. Make sure solana-test-validator is running.`,
     );
   }
 }

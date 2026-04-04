@@ -4,19 +4,25 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "bootstrap": "tsx bootstrap-devnet.ts"
+    "bootstrap": "tsx bootstrap-devnet.ts",
+    "bootstrap:localnet": "tsx bootstrap-localnet.ts",
+    "check-bootstrap": "tsx check-bootstrap.ts",
+    "fund-wallet": "tsx fund-wallet.ts",
+    "fund-wallet:localnet": "tsx fund-wallet-localnet.ts",
+    "test-payment-flow": "tsx test-payment-flow.ts",
+    "test-payment-flow:localnet": "tsx test-payment-flow-localnet.ts"
   },
   "dependencies": {
+    "@solana-program/compute-budget": "^0.15.0",
+    "@solana-program/system": "^0.12.0",
+    "@solana-program/token": "^0.13.0",
+    "@solana-program/token-2022": "^0.9.0",
     "@solana/kit": "^6.6.0",
     "@solana/sysvars": "^5.0.0",
-    "@solana-program/system": "^0.12.0",
-    "@solana-program/token-2022": "^0.9.0",
-    "@solana-program/token": "^0.13.0",
-    "@solana-program/compute-budget": "^0.15.0",
     "tsx": "^4.19.0"
   },
   "devDependencies": {
-    "@types/node": "^20.19.0",
+    "@types/node": "^20.19.39",
     "typescript": "^5.8.0"
   }
 }
