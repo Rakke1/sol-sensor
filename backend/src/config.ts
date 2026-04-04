@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { createSolanaRpc } from '@solana/kit';
+import { createSolanaRpc, address, type Address } from '@solana/kit';
 
 dotenv.config();
 
@@ -10,6 +10,17 @@ export const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:3000';
 export const SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL ?? 'https://api.devnet.solana.com';
 export const PROGRAM_ID_STR = process.env.PROGRAM_ID ?? '';
+export const PROGRAM_ID: Address = address(
+  PROGRAM_ID_STR || '11111111111111111111111111111111',
+);
+export const USDC_MINT_ADDRESS: Address = address(
+  process.env.USDC_MINT_ADDRESS || '11111111111111111111111111111111',
+);
+export const POOL_MINT_ADDRESS: Address = address(
+  process.env.POOL_MINT_ADDRESS || '11111111111111111111111111111111',
+);
+export const HARDWARE_OWNER_ADDRESS: string =
+  process.env.HARDWARE_OWNER_ADDRESS ?? '';
 export const COSIGNER_KEYPAIR_PATH =
   process.env.COSIGNER_KEYPAIR_PATH ?? './keys/cosigner.json';
 export const SENSOR_KEYPAIR_PATH =

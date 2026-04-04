@@ -1,43 +1,58 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { fetchEncodedAccount, type Address } from '@solana/kit';
+import { rpc } from '@/lib/rpc';
+import { deriveAta } from '@/lib/pda';
+import { POOL_MINT_ADDRESS } from '@/lib/constants';
 
-/**
- * Fetches the Token-2022 balance for the connected wallet.
- *
- * In the full implementation, fetches the associated token account for the
- * SolSensor Token-2022 mint via Kit's `fetchEncodedAccount` and decodes the
- * `amount` field using the Token-2022 account codec.
- *
- * @param walletAddress - base58 wallet address, or null if not connected
- * @returns balance in raw token units (with 6 decimals), loading state, and error
- */
 export function useTokenBalance(walletAddress: string | null) {
-  const [balance, setBalance] = useState<bigint>(BigInt(0));
+  const [balance, setBalance] = useState<bigint>(0n);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!walletAddress) {
-      setBalance(BigInt(0));
+  const fetchBalance = useCallback(async () => {
+    if (!walletAddress || !POOL_MINT_ADDRESS) {
+      setBalance(0n);
+
       return;
     }
 
-    async function fetchBalance() {
-      try {
-        setLoading(true);
-        // MVP: mock token balance (1,250 SLSN with 6 decimals).
-        // Replace with fetchEncodedAccount(rpc, tokenAccount) + decodeToken2022Account.
-        setBalance(BigInt(1_250) * BigInt(10 ** 6));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch token balance');
-      } finally {
-        setLoading(false);
-      }
-    }
+    setLoading(true);
+    try {
+      const ata = await deriveAta(
+        POOL_MINT_ADDRESS as Address,
+        walletAddress as Address,
+      );
+      const account = await fetchEncodedAccount(rpc, ata);
 
-    fetchBalance();
+      if (!account.exists) {
+        setBalance(0n);
+        setError(null);
+        setLoading(false);
+
+        return;
+      }
+
+      const data = account.data as Uint8Array;
+      if (data.length >= 72) {
+        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        setBalance(view.getBigUint64(64, true));
+      } else {
+        setBalance(0n);
+      }
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch balance');
+      setBalance(0n);
+    } finally {
+      setLoading(false);
+    }
   }, [walletAddress]);
 
-  return { balance, loading, error };
+  useEffect(() => {
+    fetchBalance();
+  }, [fetchBalance]);
+
+  return { balance, loading, error, refetch: fetchBalance };
 }

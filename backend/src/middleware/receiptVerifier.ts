@@ -1,19 +1,15 @@
 import type { Request, Response, NextFunction } from 'express';
 import { validateReceipt } from '../services/receiptService';
+import { getSensorPubkey } from '../services/sensorSimulator';
 
 /**
  * On-chain receipt verifier middleware.
  *
- * Assumes the `x-query-receipt` header is present (checked by http402
- * middleware before this one runs). Fetches and decodes the QueryReceipt
- * PDA from Solana devnet, then:
- *  - Returns 403 if the receipt is already consumed or expired
- *  - Returns 403 if `x-sensor-id` header doesn't match the receipt's sensor_id
- *  - Stores `res.locals.receipt` for downstream route handlers
- *  - Calls next() to continue to the sensor data route on success
+ * Expects both `x-query-receipt` (receipt PDA address) and `x-query-nonce`
+ * (base64url-encoded 32-byte nonce used in pay_for_query) headers.
  *
- * Note: Receipt consumption (consume_receipt instruction) happens AFTER the
- * sensor data is generated, inside the route handler, to ensure atomicity.
+ * Validates the receipt on-chain, checks sensor_id matches the requested
+ * sensor, and stores receipt + nonce in res.locals for the route handler.
  */
 export async function receiptVerifier(
   req: Request,
@@ -21,18 +17,44 @@ export async function receiptVerifier(
   next: NextFunction,
 ): Promise<void> {
   const receiptPda = req.headers['x-query-receipt'] as string;
+  const nonceB64 = req.headers['x-query-nonce'] as string | undefined;
 
-  const result = await validateReceipt(receiptPda).catch((err: unknown) => ({
-    valid: false as const,
-    error: `Internal error during receipt validation: ${String(err)}`,
-    receipt: undefined,
-  }));
+  if (!nonceB64) {
+    res.status(400).json({ error: 'Missing x-query-nonce header' });
+
+    return;
+  }
+
+  let nonceBytes: Uint8Array;
+  try {
+    nonceBytes = new Uint8Array(Buffer.from(nonceB64, 'base64url'));
+    if (nonceBytes.length !== 32) {
+      throw new Error('nonce must be 32 bytes');
+    }
+  } catch {
+    res.status(400).json({ error: 'Invalid x-query-nonce: expected base64url-encoded 32 bytes' });
+
+    return;
+  }
+
+  const expectedSensorId = getSensorPubkey();
+
+  const result = await validateReceipt(receiptPda, expectedSensorId).catch(
+    (err: unknown) => ({
+      valid: false as const,
+      error: `Internal error during receipt validation: ${String(err)}`,
+      receipt: undefined,
+    }),
+  );
 
   if (!result.valid) {
     res.status(403).json({ error: result.error ?? 'Invalid receipt' });
+
     return;
   }
 
   res.locals['receipt'] = result.receipt;
+  res.locals['receiptPda'] = receiptPda;
+  res.locals['nonce'] = nonceBytes;
   next();
 }

@@ -29,28 +29,13 @@ Completed in main (Option A implemented):
 
 ---
 
-### 3. `program-build-deploy`
+### ~~3. `program-build-deploy`~~ DONE
 
-**Priority:** Gate for all integration work.
+Completed by colleague. Program deployed to devnet:
+https://explorer.solana.com/address/ETu1YLCnZyeeWBYYLSFXLNncJa4AgaHaZQ8JSUxTEosJ?cluster=devnet
 
-**Status:** Partially done — program ID set, CI added, config updated. Build/deploy not yet confirmed.
-
-**What's already done:**
-- Real program ID generated: `ETu1YLCnZyeeWBYYLSFXLNncJa4AgaHaZQ8JSUxTEosJ`
-- `declare_id!` in `lib.rs` updated
-- `Anchor.toml` updated with real program ID
-- `constants.ts` (frontend) and `.env.example` (backend) updated
-- CI pipeline added (`.github/workflows/programs-ci.yml` — runs `anchor build && anchor test`)
-- `mollusk-svm` and `litesvm` removed from dev-deps (Solana 2.2.x / 2.1.x conflict)
-
-**Remaining:**
-- Verify `anchor build` succeeds locally (CI may not have run yet)
-- Run `anchor test` — unit tests should pass
-- Deploy to devnet: `anchor deploy --provider.cluster devnet`
-- Confirm program is live on devnet explorer
-
-**Files:**
-- `programs/` (build + deploy)
+Program ID: `ETu1YLCnZyeeWBYYLSFXLNncJa4AgaHaZQ8JSUxTEosJ`
+All config files updated. CI pipeline active.
 
 ---
 
@@ -227,10 +212,10 @@ Day 4:         integration-tests → ui-polish → buffer
 |---|-------------------------------|-----------|------------|-------------|
 | 1 | `complete-initialize-pool`    | program   | DONE       | ~~Large~~   |
 | 2 | `fix-refund-accumulator`      | program   | DONE       | ~~Medium~~  |
-| 3 | `program-build-deploy`        | program   | Partial    | Small       |
-| 4 | `devnet-bootstrap-script`     | scripts   | TODO       | Medium      |
-| 5 | `backend-payment-flow`        | backend   | TODO       | Large       |
-| 6 | `frontend-wallet-verification`| frontend  | TODO       | Small       |
-| 7 | `frontend-chain-integration`  | frontend  | TODO       | Large       |
+| 3 | `program-build-deploy`        | program   | DONE       | ~~Small~~   |
+| 4 | `devnet-bootstrap-script`     | scripts   | DONE       | ~~Medium~~  |
+| 5 | `backend-payment-flow`        | backend   | DONE       | ~~Large~~   |
+| 6 | `frontend-wallet-verification`| frontend  | DONE       | ~~Small~~   |
+| 7 | `frontend-chain-integration`  | frontend  | DONE       | ~~Large~~   |
 | 8 | `integration-tests`           | program   | Blocked    | Medium      |
-| 9 | `ui-polish`                   | all       | TODO       | Small       |
+| 9 | `ui-polish`                   | all       | DONE       | ~~Small~~   |

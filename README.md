@@ -74,7 +74,7 @@ Every data response includes an **Ed25519 signature** from the source sensor, en
 |-----------|------|------|
 | **Smart Contract** | Rust / Anchor | Token-2022 pool management, on-chain payment verification, atomic revenue splits, claim-based rewards, Transfer Hook |
 | **API Gateway** | TypeScript / Express / `@solana/kit` | HTTP 402 payment middleware, on-chain receipt verification via Kit RPC, Ed25519-signed sensor data delivery |
-| **Dashboard** | Next.js / `@solana/client` + `@solana/react-hooks` | Wallet Standard-first connection, contributor dashboard, unit economics simulator, end-to-end client demo with signature verification |
+| **Dashboard** | Next.js / `@solana/kit` v6 + `@solana/web3.js` | Phantom wallet connection, contributor dashboard with real on-chain data, unit economics simulator, end-to-end client demo with signature verification |
 
 ### Key Technical Highlights
 
@@ -98,32 +98,54 @@ Every data response includes an **Ed25519 signature** from the source sensor, en
 - [Node.js](https://nodejs.org/) ≥ 18
 - A Solana wallet with devnet SOL (`solana airdrop 2`)
 
-### Build & Deploy
+### Quick Start (Devnet)
+
+The program is already deployed to devnet at [`ETu1YLCnZyeeWBYYLSFXLNncJa4AgaHaZQ8JSUxTEosJ`](https://explorer.solana.com/address/ETu1YLCnZyeeWBYYLSFXLNncJa4AgaHaZQ8JSUxTEosJ?cluster=devnet).
 
 ```bash
 # 1. Clone the repo
 git clone https://github.com/Rakke1/sol-sensor.git
 cd sol-sensor
 
-# 2. Build the Anchor program
+# 2. Bootstrap devnet environment (creates mock USDC, pool, test sensor, keypairs)
+cd scripts && npm install
+npx tsx bootstrap-devnet.ts
+# The script prints all on-chain addresses — copy them for the next step
+
+# 3. Configure environment files
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+# Paste USDC_MINT_ADDRESS, POOL_MINT_ADDRESS, etc. from bootstrap output
+
+# 4. Fund your Phantom wallet with mock USDC for testing
+npx tsx fund-wallet.ts <YOUR_PHANTOM_ADDRESS> 100
+cd ..
+
+# 5. Start the API server
+cd backend && npm install
+npx ts-node src/index.ts
+
+# 6. Start the frontend (in another terminal)
+cd frontend && npm install
+npm run dev
+```
+
+Open http://localhost:3000, connect Phantom (devnet), and run the **Client Simulator** demo.
+
+The bootstrap script is **idempotent** — re-running it skips already-completed steps.
+
+### Build & Deploy (from source)
+
+```bash
+# Build the Anchor program
 cd programs
 anchor build
 
-# 3. Deploy to devnet
+# Deploy to devnet
 anchor deploy --provider.cluster devnet
 
-# 4. Run tests
+# Run unit tests
 anchor test
-
-# 5. Start the API server
-cd ../backend
-npm install
-npm run dev
-
-# 6. Start the frontend
-cd ../frontend
-npm install
-npm run dev
 ```
 
 ---
@@ -132,23 +154,29 @@ npm run dev
 
 ```
 sol-sensor/
-├── programs/               # Anchor smart contract (Rust)
-│   └── sol-sensor/
-│       └── src/
-│           └── lib.rs      # All instructions & state
-├── backend/                # HTTP 402 API gateway (TypeScript + @solana/kit)
+├── programs/                 # Anchor smart contract (Rust)
+│   └── sol-sensor/src/
+│       ├── instructions/     # initialize_pool, pay_for_query, consume_receipt, etc.
+│       └── state/            # GlobalState, SensorPool, QueryReceipt, ContributorState
+├── backend/                  # HTTP 402 API gateway (TypeScript + @solana/kit)
 │   ├── src/
-│   │   ├── middleware/     # 402 payment middleware
-│   │   ├── services/       # Kit RPC client, receipt verification, sensor simulator
+│   │   ├── middleware/       # http402 payment challenge, receiptVerifier
+│   │   ├── services/        # solana.ts (RPC + consume_receipt), pda.ts, sensorSimulator
+│   │   ├── utils/           # base58, ATA derivation
 │   │   └── index.ts
-│   └── README.md           # Backend technical docs & roadmap
-├── frontend/               # Next.js dashboard (@solana/client + @solana/react-hooks)
+│   └── keys/                # cosigner.json, sensor.json
+├── frontend/                 # Next.js dashboard (@solana/kit + @solana/web3.js)
 │   ├── src/
-│   │   ├── components/     # Contributor, Economics, Client Simulator views
-│   │   ├── hooks/          # Pool data, contributor state, token balance
-│   │   └── lib/            # Constants, Codama program client, signature verification
-│   └── README.md           # Frontend technical docs & roadmap
-└── README.md
+│   │   ├── components/      # ContributorDashboard, ClientSimulator, PoolStats
+│   │   ├── hooks/           # usePoolData, useContributor, useTokenBalance (on-chain)
+│   │   └── lib/             # rpc, pda, program, tx, decoders, format, verify
+│   └── .env.example
+├── scripts/                  # Devnet tooling (@solana/kit)
+│   ├── bootstrap-devnet.ts  # One-command devnet setup
+│   ├── fund-wallet.ts       # Mint mock USDC to any wallet
+│   ├── test-payment-flow.ts # E2E smoke test
+│   └── lib/                 # Shared: keypair, rpc, pda, instructions
+└── openspec/                 # Change management artifacts
 ```
 
 ---
@@ -159,11 +187,11 @@ sol-sensor/
 
 | Day | Milestone | Status |
 |-----|-----------|--------|
-| 1 | Anchor scaffold, Token-2022 Mint + Transfer Hook + `ExtraAccountMetaList`, `init_contributor` instruction, Next.js skeleton | 🔲 |
-| 2 | `transfer_hook` + `sync_rewards` fallback, `register_sensor`, `pay_for_query` (nonce PDA), `consume_receipt` (authority + close), API with Ed25519 signing | 🔲 |
-| 3 | `claim_rewards` (precision-scaled), `refund_expired_receipt`, full Anchor test suite, end-to-end Client Simulator view | 🔲 |
-| 4 | Edge case hardening, Contributor Dashboard + Unit Economics Playground, sensor simulator cron | 🔲 |
-| 5 | Buffer — integration testing, devnet deploy, UI polish, pitch video | 🔲 |
+| 1 | Anchor scaffold, Token-2022 Mint + Transfer Hook + `ExtraAccountMetaList`, `init_contributor` instruction, Next.js skeleton | ✅ |
+| 2 | `transfer_hook` + `sync_rewards` fallback, `register_sensor`, `pay_for_query` (nonce PDA), `consume_receipt` (authority + close), API with Ed25519 signing | ✅ |
+| 3 | `claim_rewards` (precision-scaled), `refund_expired_receipt`, full Anchor test suite, end-to-end Client Simulator view | ✅ |
+| 4 | Edge case hardening, Contributor Dashboard + Unit Economics Playground, sensor simulator cron | ✅ |
+| 5 | Buffer — integration testing, devnet deploy, UI polish, pitch video | ✅ |
 
 **MVP deliverables:**
 - ✅ Deployed Anchor program on Solana devnet

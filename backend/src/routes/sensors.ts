@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { http402 } from '../middleware/http402';
 import { receiptVerifier } from '../middleware/receiptVerifier';
 import { simulateSensorReading } from '../services/sensorSimulator';
+import { sendConsumeReceipt } from '../services/solana';
+import type { QueryReceiptData } from '../services/solana';
 
 const router = Router();
 
@@ -12,7 +14,7 @@ const router = Router();
  *  1. Without `x-query-receipt` header → HTTP 402 with payment challenge
  *  2. With valid `x-query-receipt` header → HTTP 200 with signed sensor data
  *
- * Supported sensor types: AQI (others fall back to AQI for the MVP simulator)
+ * After sending data, fires consume_receipt as background task.
  */
 router.get(
   '/:sensorType',
@@ -21,8 +23,16 @@ router.get(
   (req, res) => {
     const { sensorType } = req.params;
     try {
-    const response = simulateSensorReading(sensorType);
+      const response = simulateSensorReading(sensorType);
       res.status(200).json(response);
+
+      const receipt = res.locals['receipt'] as QueryReceiptData | undefined;
+      const receiptPda = res.locals['receiptPda'] as string | undefined;
+      const nonce = res.locals['nonce'] as Uint8Array | undefined;
+
+      if (receipt && receiptPda && nonce) {
+        sendConsumeReceipt(receiptPda, nonce, receipt.payer).catch(() => {});
+      }
     } catch (err) {
       console.error('[Sensors] Failed to generate sensor reading:', err);
       res.status(500).json({ error: 'Internal server error' });

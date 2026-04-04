@@ -1,15 +1,10 @@
-/**
- * Type declarations for injected Solana wallet providers.
- *
- * Covers the legacy `window.solana` interface exposed by Phantom, Solflare,
- * and other Wallet Standard-compatible extensions.  In the full Kit
- * implementation, `autoDiscover()` handles discovery automatically without
- * requiring manual window augmentation.
- */
+import type { Transaction, VersionedTransaction } from '@solana/web3.js';
 
 interface SolanaWalletProvider {
-  connect: () => Promise<{ publicKey: { toString: () => string } }>;
+  connect: () => Promise<{ publicKey: { toString: () => string; toBytes: () => Uint8Array } }>;
   disconnect?: () => void;
+  signTransaction: <T extends Transaction | VersionedTransaction>(tx: T) => Promise<T>;
+  signAllTransactions?: <T extends Transaction | VersionedTransaction>(txs: T[]) => Promise<T[]>;
   isPhantom?: boolean;
   isSolflare?: boolean;
 }

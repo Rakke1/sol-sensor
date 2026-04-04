@@ -1,58 +1,83 @@
 'use client';
 
 import React, { useState } from 'react';
+import type { Address } from '@solana/kit';
 import PoolStats from './PoolStats';
 import InitContributor from './InitContributor';
 import { usePoolData } from '@/hooks/usePoolData';
 import { useContributor } from '@/hooks/useContributor';
+import { buildClaimRewardsIx } from '@/lib/program';
+import { signAndSendTransaction } from '@/lib/tx';
+import { deriveSensorPool, deriveContributorState, deriveAta } from '@/lib/pda';
+import { USDC_MINT_ADDRESS, POOL_MINT_ADDRESS } from '@/lib/constants';
+import { formatUsdc, formatTokens, formatSupplyPct } from '@/lib/format';
 
 interface ContributorDashboardProps {
   walletAddress: string | null;
   onConnect: () => void;
 }
 
-function formatUsdc(microUsdc: bigint): string {
-  return (Number(microUsdc) / 1_000_000).toFixed(2);
-}
-
-function formatTokens(rawTokens: bigint): string {
-  return (Number(rawTokens) / 1_000_000).toLocaleString(undefined, {
-    maximumFractionDigits: 2,
-  });
-}
-
 export default function ContributorDashboard({
   walletAddress,
   onConnect,
 }: ContributorDashboardProps) {
-  const { pool, loading: poolLoading } = usePoolData();
-  const { contributor, claimable, loading: contribLoading } = useContributor(
+  const { pool, poolMint, poolVault, loading: poolLoading } = usePoolData();
+  const { contributor, claimable, loading: contribLoading, refetch: refetchContrib } = useContributor(
     walletAddress,
     pool,
   );
   const [claiming, setClaiming] = useState(false);
+  const [claimTx, setClaimTx] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
 
   async function handleClaim() {
-    if (!walletAddress) return;
+    if (!walletAddress || !poolVault) {
+      return;
+    }
+
     try {
       setClaiming(true);
       setClaimError(null);
-      // MVP: stub — replace with Kit pipe + getClaimRewardsInstruction +
-      // signAndSendTransactionMessageWithSigners.
-      await new Promise((r) => setTimeout(r, 1800));
-      alert('Rewards claimed! (demo stub)');
+      setClaimTx(null);
+
+      const sensorPool = await deriveSensorPool();
+      const contributorState = await deriveContributorState(walletAddress as Address);
+      const holderTokenAccount = await deriveAta(
+        (poolMint ?? POOL_MINT_ADDRESS) as Address,
+        walletAddress as Address,
+      );
+      const holderUsdc = await deriveAta(
+        USDC_MINT_ADDRESS as Address,
+        walletAddress as Address,
+      );
+
+      const ix = await buildClaimRewardsIx({
+        holder: walletAddress as Address,
+        sensorPool,
+        contributorState,
+        holderTokenAccount,
+        usdcMint: USDC_MINT_ADDRESS as Address,
+        holderUsdc,
+        poolVault: poolVault as Address,
+      });
+
+      const sig = await signAndSendTransaction([ix], walletAddress);
+      setClaimTx(sig);
+      refetchContrib();
     } catch (err) {
-      setClaimError(err instanceof Error ? err.message : 'Claim failed');
+      const msg = err instanceof Error ? err.message : 'Claim failed';
+      if (msg.includes('User rejected')) {
+        setClaimError('Transaction rejected by user');
+      } else {
+        setClaimError(msg);
+      }
     } finally {
       setClaiming(false);
     }
   }
 
   const supplyPct =
-    pool && pool.maxSupply > 0n
-      ? Number((pool.totalSupply * 100n) / pool.maxSupply)
-      : 0;
+    pool ? formatSupplyPct(pool.totalSupply, pool.maxSupply) : '0.0';
 
   return (
     <div className="space-y-6">
@@ -119,27 +144,19 @@ export default function ContributorDashboard({
           {claimError && (
             <p className="text-xs text-red-400 mt-2">{claimError}</p>
           )}
-        </div>
-      )}
-
-      {/* Reward History (mock) */}
-      {walletAddress && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-6">
-          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-            Reward History
-          </h3>
-          <ul className="space-y-2 text-sm">
-            {[
-              { amount: '3.20', when: '2 hours ago' },
-              { amount: '5.10', when: '1 day ago' },
-              { amount: '4.15', when: '3 days ago' },
-            ].map((item, i) => (
-              <li key={i} className="flex justify-between text-slate-300">
-                <span>Claimed {item.amount} USDC</span>
-                <span className="text-slate-500">{item.when}</span>
-              </li>
-            ))}
-          </ul>
+          {claimTx && (
+            <p className="text-xs text-green-400 mt-2">
+              Rewards claimed!{' '}
+              <a
+                href={`https://solscan.io/tx/${claimTx}?cluster=devnet`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                View tx ↗
+              </a>
+            </p>
+          )}
         </div>
       )}
 

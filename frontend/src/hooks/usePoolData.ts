@@ -1,44 +1,53 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { fetchEncodedAccount, address } from '@solana/kit';
+import { rpc } from '@/lib/rpc';
+import { deriveSensorPool } from '@/lib/pda';
+import { decodeSensorPool } from '@/lib/decoders';
 import type { SensorPool } from '@/types';
 
-/**
- * Fetches and decodes the SensorPool PDA from Solana.
- *
- * In the full implementation, this uses @solana/kit's `fetchEncodedAccount`
- * plus a Codama-generated `decodeSensorPool` codec to read live on-chain data.
- * For the MVP, returns mock data to unblock UI development.
- */
+const POLL_INTERVAL_MS = 30_000;
+
 export function usePoolData() {
   const [pool, setPool] = useState<SensorPool | null>(null);
+  const [poolMint, setPoolMint] = useState<string | null>(null);
+  const [poolVault, setPoolVault] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchPool() {
-      try {
-        setLoading(true);
-        // MVP: mock data mirroring the on-chain SensorPool account structure.
-        // Replace with `fetchEncodedAccount(rpc, poolPda)` + `decodeSensorPool`.
-        const mockPool: SensorPool = {
-          totalSupply: BigInt(8_000_000) * BigInt(10 ** 6), // 8M SLSN with 6 decimals
-          maxSupply: BigInt(10_000_000) * BigInt(10 ** 6),  // 10M SLSN with 6 decimals
-          rewardPerToken: BigInt(95_250_000_000_000n),
-          activeSensors: 24,
-          totalQueries: BigInt(15_230),
-          totalDistributed: BigInt(761_500_000), // 761.50 USDC (6 decimals)
-        };
-        setPool(mockPool);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch pool data');
-      } finally {
-        setLoading(false);
-      }
-    }
+  const fetchPool = useCallback(async () => {
+    try {
+      const poolPda = await deriveSensorPool();
+      const account = await fetchEncodedAccount(rpc, poolPda);
 
-    fetchPool();
+      if (!account.exists) {
+        setPool(null);
+        setError('SensorPool account not found on-chain');
+        setLoading(false);
+
+        return;
+      }
+
+      const decoded = decodeSensorPool(account.data as Uint8Array);
+      setPool(decoded);
+      setPoolMint(decoded.mint);
+      setPoolVault(decoded.vault);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch pool data');
+      setPool(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return { pool, loading, error };
+  useEffect(() => {
+    fetchPool();
+    const id = setInterval(fetchPool, POLL_INTERVAL_MS);
+
+    return () => clearInterval(id);
+  }, [fetchPool]);
+
+  return { pool, poolMint, poolVault, loading, error, refetch: fetchPool };
 }
