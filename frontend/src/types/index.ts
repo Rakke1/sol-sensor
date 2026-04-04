@@ -44,10 +44,13 @@ export interface PaymentChallenge {
     price: { amount: number; currency: string; decimals: number };
     suggestedNonce: string;
     accounts: {
+      globalState: string;
       sensorPool: string;
       poolVault: string;
       hardwareEntry: string;
       hardwareOwner: string;
+      hardwareOwnerUsdc: string;
+      usdcMint: string;
     };
   };
 }

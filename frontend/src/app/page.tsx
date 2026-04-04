@@ -16,7 +16,7 @@ const NAV_ITEMS: { id: View; label: string; icon: string }[] = [
 
 export default function Home() {
   const [view, setView] = useState<View>('dashboard');
-  const { walletAddress, connected, connect, disconnect } = useWallet();
+  const { walletAddress, solBalance, connected, networkMismatch, walletError, connect, disconnect } = useWallet();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -35,6 +35,10 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <span className="hidden sm:inline text-xs text-slate-400 font-mono">
                 {walletAddress.slice(0, 4)}…{walletAddress.slice(-4)}
+                {' · '}
+                <span className="text-[#14F195]">
+                  {solBalance !== null ? `${solBalance.toFixed(2)} SOL` : '— SOL'}
+                </span>
               </span>
               <button
                 onClick={disconnect}
@@ -44,15 +48,28 @@ export default function Home() {
               </button>
             </div>
           ) : (
-            <button
-              onClick={connect}
-              className="rounded-lg bg-[#14F195] px-4 py-1.5 text-sm font-semibold text-black hover:opacity-90 transition-opacity"
-            >
-              Connect Wallet
-            </button>
+            <div className="flex items-center gap-3">
+              {walletError && (
+                <span className="text-xs text-amber-400 max-w-[200px] truncate">
+                  {walletError}
+                </span>
+              )}
+              <button
+                onClick={connect}
+                className="rounded-lg bg-[#14F195] px-4 py-1.5 text-sm font-semibold text-black hover:opacity-90 transition-opacity"
+              >
+                Connect Wallet
+              </button>
+            </div>
           )}
         </div>
       </header>
+
+      {networkMismatch && (
+        <div className="bg-amber-500/20 border-b border-amber-500/30 px-4 py-2 text-center text-xs text-amber-300">
+          Connected to wrong network — expected devnet
+        </div>
+      )}
 
       <div className="flex flex-1 mx-auto w-full max-w-6xl">
         {/* Sidebar */}

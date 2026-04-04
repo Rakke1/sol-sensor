@@ -2,8 +2,13 @@
 
 import React, { useState } from 'react';
 import type { DemoState, PaymentChallenge, SensorResponse } from '@/types';
-import { API_URL } from '@/lib/constants';
-import { generateNonce, verifySensorSignature } from '@/lib/verify';
+import type { Address } from '@solana/kit';
+import { API_URL, QUERY_PRICE_MICRO_USDC } from '@/lib/constants';
+import { verifySensorSignature } from '@/lib/verify';
+import { deriveReceiptPda, deriveAta } from '@/lib/pda';
+import { buildPayForQueryIx } from '@/lib/program';
+import { signAndSendTransaction } from '@/lib/tx';
+import { useWallet } from '@/app/providers';
 
 const INITIAL_STATE: DemoState = {
   step: 'idle',
@@ -68,12 +73,23 @@ function StepRow({
 
 export default function ClientSimulator() {
   const [demo, setDemo] = useState<DemoState>(INITIAL_STATE);
+  const { walletAddress, connected } = useWallet();
 
   function patch(partial: Partial<DemoState>) {
     setDemo((d) => ({ ...d, ...partial }));
   }
 
   async function runDemo() {
+    if (!connected || !walletAddress) {
+      setDemo({
+        ...INITIAL_STATE,
+        step: 'error',
+        error: 'Please connect your wallet first.',
+      });
+
+      return;
+    }
+
     setDemo({ ...INITIAL_STATE, step: 'requesting' });
 
     try {
@@ -84,13 +100,13 @@ export default function ClientSimulator() {
       if (res1.status === 402) {
         challenge = (await res1.json()) as PaymentChallenge;
       } else if (res1.ok) {
-        // Backend returned 200 without requiring payment (dev mode without auth)
         const data = (await res1.json()) as SensorResponse;
         patch({
           step: 'done',
           response: data,
           signatureValid: await verifySensorSignature(data),
         });
+
         return;
       } else {
         throw new Error(`Unexpected status ${res1.status} from API`);
@@ -98,47 +114,74 @@ export default function ClientSimulator() {
 
       patch({ step: 'paying', challenge });
 
-      // Step 2: Pay on-chain (stub — generates nonce, simulates tx in demo)
-      await new Promise((r) => setTimeout(r, 1200));
-      const nonce = generateNonce();
-      const mockTxSig = `demo_tx_${nonce.slice(0, 8)}`;
-      const mockReceiptPda = `receipt_${nonce.slice(0, 8)}`;
+      // Step 2: Build and send pay_for_query on-chain
+      const nonceB64 = challenge.payment.suggestedNonce;
+      const nonceBytes = new Uint8Array(
+        atob(nonceB64.replace(/-/g, '+').replace(/_/g, '/'))
+          .split('')
+          .map((c) => c.charCodeAt(0)),
+      );
+
+      const receiptPda = await deriveReceiptPda(nonceBytes);
+      const accounts = challenge.payment.accounts;
+
+      const payerUsdc = await deriveAta(
+        accounts.usdcMint as Address,
+        walletAddress as Address,
+      );
+
+      const ix = await buildPayForQueryIx(
+        {
+          payer: walletAddress as Address,
+          globalState: accounts.globalState as Address,
+          sensorPool: accounts.sensorPool as Address,
+          hardwareEntry: accounts.hardwareEntry as Address,
+          hardwareOwnerUsdc: accounts.hardwareOwnerUsdc as Address,
+          payerUsdc,
+          poolVault: accounts.poolVault as Address,
+          usdcMint: accounts.usdcMint as Address,
+          queryReceipt: receiptPda,
+        },
+        nonceBytes,
+        BigInt(QUERY_PRICE_MICRO_USDC),
+      );
+
+      const txSignature = await signAndSendTransaction([ix], walletAddress);
 
       patch({
         step: 'fetching',
-        txSignature: mockTxSig,
-        receiptPda: mockReceiptPda,
+        txSignature,
+        receiptPda,
       });
 
-      // Step 3: Fetch signed sensor data with receipt header
+      // Step 3: Fetch signed sensor data with receipt + nonce headers
       const res2 = await fetch(`${API_URL}/api/v1/sensors/AQI`, {
-        headers: { 'x-query-receipt': mockReceiptPda },
+        headers: {
+          'x-query-receipt': receiptPda,
+          'x-query-nonce': nonceB64,
+        },
       });
 
-      let sensorResponse: SensorResponse;
-      if (res2.ok) {
-        sensorResponse = (await res2.json()) as SensorResponse;
-      } else if (res2.status === 402) {
-        // Dev environment without on-chain verification — skip receipt step
-        const body = await res2.json();
+      if (!res2.ok) {
+        const body = await res2.json().catch(() => ({}));
         throw new Error(
-          `API returned 402 even with receipt: ${JSON.stringify(body)}`,
+          `API error ${res2.status}: ${JSON.stringify(body)}`,
         );
-      } else {
-        throw new Error(`API error ${res2.status}`);
       }
 
+      const sensorResponse = (await res2.json()) as SensorResponse;
       patch({ step: 'verifying', response: sensorResponse });
 
       // Step 4: Verify Ed25519 signature client-side
-      await new Promise((r) => setTimeout(r, 600));
       const isValid = await verifySensorSignature(sensorResponse);
       patch({ step: 'done', signatureValid: isValid });
     } catch (err) {
-      patch({
-        step: 'error',
-        error: err instanceof Error ? err.message : 'Unknown error',
-      });
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      if (message.includes('User rejected')) {
+        patch({ step: 'error', error: 'Transaction rejected by user' });
+      } else {
+        patch({ step: 'error', error: message });
+      }
     }
   }
 
@@ -154,7 +197,7 @@ export default function ClientSimulator() {
         <div>
           <h2 className="text-2xl font-bold text-white">Enterprise Client Simulator</h2>
           <p className="text-slate-400 text-sm mt-1">
-            End-to-end HTTP 402 payment demo — see the full cycle in &lt;60 seconds
+            End-to-end HTTP 402 payment flow — real on-chain transactions
           </p>
         </div>
         <button
@@ -167,7 +210,6 @@ export default function ClientSimulator() {
       </div>
 
       <div className="space-y-3">
-        {/* Step 1 */}
         <StepRow
           number={1}
           title="Request Data"
@@ -184,14 +226,13 @@ export default function ClientSimulator() {
           )}
         </StepRow>
 
-        {/* Step 2 */}
         <StepRow
           number={2}
           title="Pay On-Chain"
           done={step === 'fetching' || step === 'verifying' || isDone}
           active={step === 'paying'}
         >
-          <p>→ pay_for_query(sensor_id, nonce)</p>
+          <p>→ pay_for_query(nonce, amount) — signed by wallet</p>
           {txSignature && (
             <>
               <p>← Receipt PDA: {receiptPda}</p>
@@ -203,21 +244,20 @@ export default function ClientSimulator() {
                   rel="noopener noreferrer"
                   className="text-[#14F195] underline"
                 >
-                  {txSignature} ↗
+                  {txSignature.slice(0, 20)}… ↗
                 </a>
               </p>
             </>
           )}
         </StepRow>
 
-        {/* Step 3 */}
         <StepRow
           number={3}
           title="Fetch Signed Data"
           done={step === 'verifying' || isDone}
           active={step === 'fetching'}
         >
-          <p>→ GET /api/v1/sensors/AQI + receipt header</p>
+          <p>→ GET /api/v1/sensors/AQI + receipt + nonce headers</p>
           {response && (
             <p>
               ← AQI: {response.data.aqi} | Temp: {response.data.temperature}°C |
@@ -226,7 +266,6 @@ export default function ClientSimulator() {
           )}
         </StepRow>
 
-        {/* Step 4 */}
         <StepRow
           number={4}
           title="Verify Signature"
@@ -252,7 +291,6 @@ export default function ClientSimulator() {
         </StepRow>
       </div>
 
-      {/* Raw JSON */}
       {response && (
         <details className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
           <summary className="cursor-pointer select-none px-5 py-3 text-sm text-slate-400 hover:text-white transition-colors">
@@ -264,7 +302,6 @@ export default function ClientSimulator() {
         </details>
       )}
 
-      {/* Error */}
       {isError && error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
           <strong>Error:</strong> {error}

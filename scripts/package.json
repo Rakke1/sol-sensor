@@ -1,0 +1,22 @@
+{
+  "name": "sol-sensor-scripts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bootstrap": "tsx bootstrap-devnet.ts"
+  },
+  "dependencies": {
+    "@solana/kit": "^6.6.0",
+    "@solana/sysvars": "^5.0.0",
+    "@solana-program/system": "^0.12.0",
+    "@solana-program/token-2022": "^0.9.0",
+    "@solana-program/token": "^0.13.0",
+    "@solana-program/compute-budget": "^0.15.0",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -37,6 +37,9 @@ export interface PaymentAccounts {
   poolVault: string;
   hardwareEntry: string;
   hardwareOwner: string;
+  usdcMint: string;
+  hardwareOwnerUsdc: string;
+  globalState: string;
 }
 
 export interface PaymentDetails {

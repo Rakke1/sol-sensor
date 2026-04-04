@@ -1,19 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
+import type { Address } from '@solana/kit';
+import { buildInitContributorIx } from '@/lib/program';
+import { signAndSendTransaction } from '@/lib/tx';
+import { deriveSensorPool, deriveContributorState } from '@/lib/pda';
 
 interface InitContributorProps {
   walletAddress: string | null;
   onSuccess?: () => void;
 }
 
-/**
- * Button that sends the `init_contributor` instruction on-chain.
- *
- * This must be called once by each wallet before it can receive SLSN tokens.
- * The instruction initialises the ContributorState PDA, which the Transfer
- * Hook reads to settle pending rewards on every token transfer.
- */
 export default function InitContributor({
   walletAddress,
   onSuccess,
@@ -23,17 +20,33 @@ export default function InitContributor({
   const [error, setError] = useState<string | null>(null);
 
   async function handleInit() {
-    if (!walletAddress) return;
+    if (!walletAddress) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      // MVP: stub — replace with Kit pipe + getInitContributorInstruction +
-      // signAndSendTransactionMessageWithSigners.
-      await new Promise((r) => setTimeout(r, 1500));
+
+      const sensorPool = await deriveSensorPool();
+      const contributorState = await deriveContributorState(walletAddress as Address);
+
+      const ix = await buildInitContributorIx({
+        holder: walletAddress as Address,
+        sensorPool,
+        contributorState,
+      });
+
+      await signAndSendTransaction([ix], walletAddress);
       setDone(true);
       onSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Transaction failed');
+      const msg = err instanceof Error ? err.message : 'Transaction failed';
+      if (msg.includes('User rejected')) {
+        setError('Transaction rejected by user');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

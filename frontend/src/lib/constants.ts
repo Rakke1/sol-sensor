@@ -10,6 +10,12 @@ export const API_URL =
 export const SOLANA_NETWORK =
   process.env.NEXT_PUBLIC_SOLANA_NETWORK ?? 'devnet';
 
+export const USDC_MINT_ADDRESS =
+  process.env.NEXT_PUBLIC_USDC_MINT_ADDRESS ?? '';
+
+export const POOL_MINT_ADDRESS =
+  process.env.NEXT_PUBLIC_POOL_MINT_ADDRESS ?? '';
+
 /** Precision factor used in on-chain reward accumulator (10^12) */
 export const PRECISION_FACTOR = BigInt(1_000_000_000_000);
 

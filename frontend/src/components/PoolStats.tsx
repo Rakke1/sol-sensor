@@ -2,18 +2,11 @@
 
 import React from 'react';
 import type { SensorPool } from '@/types';
+import { formatUsdc, formatTokens, formatSupplyPct } from '@/lib/format';
 
 interface PoolStatsProps {
   pool: SensorPool | null;
   loading: boolean;
-}
-
-function formatUsdc(microUsdc: bigint): string {
-  return (Number(microUsdc) / 1_000_000).toFixed(2);
-}
-
-function formatTokens(rawTokens: bigint): string {
-  return (Number(rawTokens) / 1_000_000).toLocaleString();
 }
 
 export default function PoolStats({ pool, loading }: PoolStatsProps) {
@@ -32,10 +25,7 @@ export default function PoolStats({ pool, loading }: PoolStatsProps) {
 
   if (!pool) return null;
 
-  const supplyPct =
-    pool.maxSupply > 0n
-      ? Number((pool.totalSupply * 100n) / pool.maxSupply)
-      : 0;
+  const supplyPct = formatSupplyPct(pool.totalSupply, pool.maxSupply);
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-6">
