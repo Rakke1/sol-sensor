@@ -2,9 +2,9 @@
   <a href="https://github.com/Rakke1/sol-sensor/actions/workflows/programs-ci.yml">
     <img src="https://github.com/Rakke1/sol-sensor/actions/workflows/programs-ci.yml/badge.svg" alt="Programs CI"/>
   </a>
-  <img height=15 src="https://img.shields.io/badge/Solana-Devnet-14F195?style=for-the-badge&logo=solana&logoColor=white" alt="Solana Devnet"/>
-  <img height=15 src="https://img.shields.io/badge/Colosseum-2026-3178C6?style=for-the-badge" alt="Hackathon"/>
-  <img height=15 src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License"/>
+  <img height=25 src="https://img.shields.io/badge/Solana-Devnet-14F195?style=for-the-badge&logo=solana&logoColor=white" alt="Solana Devnet"/>
+  <img height=25 src="https://img.shields.io/badge/Colosseum-2026-3178C6?style=for-the-badge" alt="Hackathon"/>
+  <img height=25 src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License"/>
 </p>
 
 
