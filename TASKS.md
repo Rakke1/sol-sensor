@@ -8,49 +8,24 @@
 
 ## Phase 1 — Program: Make It Deployable
 
-### 1. `complete-initialize-pool`
+### ~~1. `complete-initialize-pool`~~ DONE
 
-**Priority:** Critical blocker — everything downstream depends on this.
-
-**Problem:** `initialize_pool` handler only writes `GlobalState` and `SensorPool` PDAs.
-It does NOT create the Token-2022 mint, USDC vault, or ExtraAccountMetaList —
-all of which are required for every other instruction to work.
-
-**Scope:**
-- Add CPI to create Token-2022 mint with `TransferHook` extension, mint authority = pool PDA
-- Add CPI to create USDC vault ATA (associated token account of pool PDA for USDC mint)
-- Add CPI to initialize `ExtraAccountMetaList` PDA (seeds: `["extra-account-metas", mint]`)
-  with extra accounts needed by `transfer_hook`: `sensor_pool`, `sender_contributor`, `receiver_contributor`
-- Update `InitializePool` accounts struct — add `usdc_mint`, `rent` sysvar if needed
-- Add USDC mint account to the instruction so vault ATA can be derived
-
-**Files:** `programs/sol-sensor/src/instructions/initialize_pool.rs`
+Completed in main. `initialize_pool` now:
+- Creates Token-2022 mint with `TransferHook` extension via Anchor `init` macro
+- Creates USDC vault ATA (`associated_token::mint = usdc_mint, authority = sensor_pool`)
+- Initializes `ExtraAccountMetaList` with 3 extra accounts (sensor_pool, sender_contributor, receiver_contributor) via `spl_tlv_account_resolution`
+- Added `usdc_mint` and `rent` sysvar to accounts struct
 
 ---
 
-### 2. `fix-refund-accumulator`
+### ~~2. `fix-refund-accumulator`~~ DONE
 
-**Priority:** Economic bug — vault can be drained.
-
-**Problem:** `refund_expired_receipt` returns 80% USDC from vault to payer and decrements
-`total_distributed`, but does NOT reverse the `reward_per_token` increment that
-`pay_for_query` added. Contributors can claim rewards from refunded payments,
-eventually emptying the vault.
-
-**Scope:**
-- Option A (recommended): Store `pool_share` and `total_supply_at_payment` in `QueryReceipt`.
-  On refund, compute exact reverse increment and subtract from `reward_per_token`.
-  Requires adding 2 fields to `QueryReceipt` (u64 + u64 = 16 bytes) and updating `LEN`.
-- Option B: Accept as design decision — document that refunds don't reverse accumulator,
-  and that hw owners + contributors keep earnings from refunded queries. Simpler but less fair.
-- Update `pay_for_query` to write the new fields if Option A.
-- Update unit tests for the new behavior.
-
-**Files:**
-- `programs/sol-sensor/src/state/query_receipt.rs`
-- `programs/sol-sensor/src/instructions/pay_for_query.rs`
-- `programs/sol-sensor/src/instructions/refund_expired.rs`
-- `programs/sol-sensor/tests/unit_tests.rs`
+Completed in main (Option A implemented):
+- `QueryReceipt` now stores `pool_share` (u64) and `total_supply_at_payment` (u64)
+- `pay_for_query` writes both new fields
+- `refund_expired_receipt` computes exact reverse increment and subtracts from `reward_per_token`
+- New unit test `refund_reverses_reward_increment` covers the round-trip
+- `QueryReceipt::LEN` updated to 114 bytes
 
 ---
 
@@ -58,20 +33,24 @@ eventually emptying the vault.
 
 **Priority:** Gate for all integration work.
 
-**Scope:**
-- Generate real program keypair (`solana-keygen grind` or `solana-keygen new`)
-- Update `declare_id!` in `lib.rs` (currently placeholder `Fg6PaFpo...`)
-- Update `Anchor.toml` with real program ID
-- Run `anchor build` — fix any compilation errors
-- Run `anchor test` (unit tests) — ensure they pass
+**Status:** Partially done — program ID set, CI added, config updated. Build/deploy not yet confirmed.
+
+**What's already done:**
+- Real program ID generated: `ETu1YLCnZyeeWBYYLSFXLNncJa4AgaHaZQ8JSUxTEosJ`
+- `declare_id!` in `lib.rs` updated
+- `Anchor.toml` updated with real program ID
+- `constants.ts` (frontend) and `.env.example` (backend) updated
+- CI pipeline added (`.github/workflows/programs-ci.yml` — runs `anchor build && anchor test`)
+- `mollusk-svm` and `litesvm` removed from dev-deps (Solana 2.2.x / 2.1.x conflict)
+
+**Remaining:**
+- Verify `anchor build` succeeds locally (CI may not have run yet)
+- Run `anchor test` — unit tests should pass
 - Deploy to devnet: `anchor deploy --provider.cluster devnet`
-- Record deployed program ID for backend/frontend config
+- Confirm program is live on devnet explorer
 
 **Files:**
-- `programs/sol-sensor/src/lib.rs`
-- `programs/Anchor.toml`
-- `backend/.env.example` (update PROGRAM_ID)
-- `frontend/src/lib/constants.ts` (update PROGRAM_ID)
+- `programs/` (build + deploy)
 
 ---
 
@@ -106,19 +85,25 @@ eventually emptying the vault.
 
 **Priority:** Core product flow — 402 → pay → verify → consume → data.
 
+**Note:** `QueryReceipt` layout changed (added `pool_share` + `total_supply_at_payment`
+after `amount`). Backend `decodeQueryReceipt` must be updated to match the new 114-byte layout.
+
 **Problem:** Backend has the HTTP 402 gate and receipt verification, but:
 - 402 challenge uses placeholder addresses (not real PDAs)
 - `consume_receipt` is never called after serving data (co-signer is loaded but unused)
 - Receipt `sensor_id` is not validated against the requested sensor
 - No discriminator or length check on decoded receipt data
+- Binary decoder assumes old 98-byte layout — **now stale** after `QueryReceipt` gained 2 fields
 
 **Scope:**
+- **Update `decodeQueryReceipt`** to match new layout:
+  `[0..8] disc, [8..40] sensor_id, [40..72] payer, [72..80] amount, [80..88] pool_share, [88..96] total_supply_at_payment, [96] consumed, [97..105] created_at, [105..113] expiry_slot, [113] bump`
 - Replace `derivePoolAddress()` / `deriveVaultAddress()` with real PDA derivation
   using program ID + seeds (`["pool"]`, etc.) via `@solana/kit`
 - Wire `hardwareOwner` from on-chain `HardwareEntry` or config
 - After returning sensor data, build + sign + send `consume_receipt` tx using co-signer
 - In `receiptVerifier`, compare `receipt.sensor_id` with the requested sensor's pubkey
-- Add 8-byte discriminator check and `data.length >= 98` guard in `decodeQueryReceipt`
+- Add 8-byte discriminator check and `data.length >= 114` guard in `decodeQueryReceipt`
 - Add proper error responses when consume fails (log but don't block data delivery)
 
 **Files:**
@@ -191,20 +176,21 @@ discriminators. No real transactions are sent.
 
 **Priority:** Confidence before demo.
 
-**Scope:**
-- Implement `flow_tests.rs` (currently 4 stubs with `#[ignore]`):
-  - `test_full_query_lifecycle`: init → register → pay → consume → claim
-  - `test_receipt_expiry_refund`: pay → warp → refund
-  - `test_transfer_hook_settles_rewards`: transfer triggers hook
-  - `test_supply_cap_enforcement`: register until cap → fail
-- Requires built `.so` (depends on task 3)
-- Optional: E2E smoke test script (curl-based or TypeScript) that hits the real
-  backend on devnet
+**Blocker:** `litesvm >= 0.5` requires Solana 2.2.x which conflicts with
+`anchor-lang 0.32.x` (Solana 2.1.x). LiteSVM and mollusk-svm have been removed
+from dev-dependencies. Flow tests remain stubs.
+
+**Revised scope:**
+- ~~Implement `flow_tests.rs` with litesvm~~ Deferred — version conflict
+- **Alternative A:** Write a TypeScript E2E smoke test that hits the real program on
+  devnet (via `@solana/kit` — send real txs, verify state)
+- **Alternative B:** Wait for Anchor 0.33.x / Solana 2.2.x compatibility and re-add litesvm
+- **Alternative C:** Use `solana-program-test` (BanksClient) if compatible with 2.1.x
+- At minimum: verify `anchor test` (unit tests) passes in CI
 
 **Files:**
-- `programs/sol-sensor/tests/flow_tests.rs`
-- `programs/sol-sensor/tests/fixtures/accounts.rs`
-- Optional new: `scripts/e2e-smoke.ts`
+- New: `scripts/e2e-smoke.ts` (preferred alternative)
+- `programs/sol-sensor/tests/flow_tests.rs` (kept as documentation of intent)
 
 ---
 
@@ -227,25 +213,24 @@ discriminators. No real transactions are sent.
 
 ---
 
-## Execution Order (4 days)
+## Execution Order (3 remaining days)
 
 ```
-Day 1:  complete-initialize-pool → fix-refund-accumulator → program-build-deploy
-Day 2:  devnet-bootstrap-script → backend-payment-flow
-Day 3:  frontend-wallet-verification → frontend-chain-integration
-Day 4:  integration-tests → ui-polish → buffer
+Day 2 (today): program-build-deploy → devnet-bootstrap-script → backend-payment-flow
+Day 3:         frontend-wallet-verification → frontend-chain-integration
+Day 4:         integration-tests → ui-polish → buffer
 ```
 
 ## Quick Reference
 
-| # | Change Name                    | Component | Est. Effort |
-|---|-------------------------------|-----------|-------------|
-| 1 | `complete-initialize-pool`    | program   | Large       |
-| 2 | `fix-refund-accumulator`      | program   | Medium      |
-| 3 | `program-build-deploy`        | program   | Medium      |
-| 4 | `devnet-bootstrap-script`     | scripts   | Medium      |
-| 5 | `backend-payment-flow`        | backend   | Large       |
-| 6 | `frontend-wallet-verification`| frontend  | Small       |
-| 7 | `frontend-chain-integration`  | frontend  | Large       |
-| 8 | `integration-tests`           | program   | Medium      |
-| 9 | `ui-polish`                   | all       | Small       |
+| # | Change Name                    | Component | Status     | Est. Effort |
+|---|-------------------------------|-----------|------------|-------------|
+| 1 | `complete-initialize-pool`    | program   | DONE       | ~~Large~~   |
+| 2 | `fix-refund-accumulator`      | program   | DONE       | ~~Medium~~  |
+| 3 | `program-build-deploy`        | program   | Partial    | Small       |
+| 4 | `devnet-bootstrap-script`     | scripts   | TODO       | Medium      |
+| 5 | `backend-payment-flow`        | backend   | TODO       | Large       |
+| 6 | `frontend-wallet-verification`| frontend  | TODO       | Small       |
+| 7 | `frontend-chain-integration`  | frontend  | TODO       | Large       |
+| 8 | `integration-tests`           | program   | Blocked    | Medium      |
+| 9 | `ui-polish`                   | all       | TODO       | Small       |

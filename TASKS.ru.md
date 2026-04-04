@@ -8,50 +8,24 @@
 
 ## Фаза 1 — Программа: довести до деплоя
 
-### 1. `complete-initialize-pool`
+### ~~1. `complete-initialize-pool`~~ ГОТОВО
 
-**Приоритет:** Критический блокер — всё остальное зависит от этого.
-
-**Проблема:** Хендлер `initialize_pool` записывает только `GlobalState` и `SensorPool` PDA.
-Он НЕ создаёт Token-2022 минт, USDC vault и ExtraAccountMetaList —
-а без них ни одна другая инструкция не заработает.
-
-**Скоуп:**
-- Добавить CPI для создания Token-2022 минта с расширением `TransferHook`, mint authority = pool PDA
-- Добавить CPI для создания USDC vault ATA (ассоциированный токен-аккаунт pool PDA для USDC минта)
-- Добавить CPI для инициализации `ExtraAccountMetaList` PDA (seeds: `["extra-account-metas", mint]`)
-  с extra accounts для `transfer_hook`: `sensor_pool`, `sender_contributor`, `receiver_contributor`
-- Обновить структуру аккаунтов `InitializePool` — добавить `usdc_mint`, `rent` sysvar если нужно
-- Добавить USDC mint аккаунт в инструкцию чтобы можно было вывести vault ATA
-
-**Файлы:** `programs/sol-sensor/src/instructions/initialize_pool.rs`
+Сделано в main. `initialize_pool` теперь:
+- Создаёт Token-2022 минт с расширением `TransferHook` через Anchor `init` макрос
+- Создаёт USDC vault ATA (`associated_token::mint = usdc_mint, authority = sensor_pool`)
+- Инициализирует `ExtraAccountMetaList` с 3 extra accounts (sensor_pool, sender_contributor, receiver_contributor) через `spl_tlv_account_resolution`
+- Добавлены `usdc_mint` и `rent` sysvar в структуру аккаунтов
 
 ---
 
-### 2. `fix-refund-accumulator`
+### ~~2. `fix-refund-accumulator`~~ ГОТОВО
 
-**Приоритет:** Экономический баг — vault может быть опустошён.
-
-**Проблема:** `refund_expired_receipt` возвращает 80% USDC из vault пейеру и уменьшает
-`total_distributed`, но НЕ откатывает инкремент `reward_per_token`, который
-добавил `pay_for_query`. Контрибьюторы могут клеймить награды с зарефанженных
-платежей, в итоге vault опустеет.
-
-**Скоуп:**
-- Вариант A (рекомендуется): Хранить `pool_share` и `total_supply_at_payment` в `QueryReceipt`.
-  При рефанде вычислить точный обратный инкремент и вычесть из `reward_per_token`.
-  Нужно добавить 2 поля в `QueryReceipt` (u64 + u64 = 16 байт) и обновить `LEN`.
-- Вариант B: Принять как design decision — задокументировать что рефанды не откатывают
-  аккумулятор, и что hw owners + контрибьюторы сохраняют заработок с зарефанженных запросов.
-  Проще, но менее справедливо.
-- Обновить `pay_for_query` чтобы записывал новые поля (если вариант A).
-- Обновить юнит-тесты.
-
-**Файлы:**
-- `programs/sol-sensor/src/state/query_receipt.rs`
-- `programs/sol-sensor/src/instructions/pay_for_query.rs`
-- `programs/sol-sensor/src/instructions/refund_expired.rs`
-- `programs/sol-sensor/tests/unit_tests.rs`
+Сделано в main (реализован Вариант A):
+- `QueryReceipt` теперь хранит `pool_share` (u64) и `total_supply_at_payment` (u64)
+- `pay_for_query` записывает оба новых поля
+- `refund_expired_receipt` вычисляет точный обратный инкремент и вычитает из `reward_per_token`
+- Новый юнит-тест `refund_reverses_reward_increment` покрывает round-trip
+- `QueryReceipt::LEN` обновлён до 114 байт
 
 ---
 
@@ -59,20 +33,24 @@
 
 **Приоритет:** Гейт для всей интеграционной работы.
 
-**Скоуп:**
-- Сгенерировать реальный keypair программы (`solana-keygen grind` или `solana-keygen new`)
-- Обновить `declare_id!` в `lib.rs` (сейчас стоит плейсхолдер `Fg6PaFpo...`)
-- Обновить `Anchor.toml` с реальным program ID
-- Запустить `anchor build` — пофиксить ошибки компиляции если будут
-- Запустить `anchor test` (юнит-тесты) — убедиться что проходят
+**Статус:** Частично готово — program ID задан, CI добавлен, конфиги обновлены. Билд/деплой не подтверждён.
+
+**Что уже сделано:**
+- Сгенерирован реальный program ID: `ETu1YLCnZyeeWBYYLSFXLNncJa4AgaHaZQ8JSUxTEosJ`
+- `declare_id!` в `lib.rs` обновлён
+- `Anchor.toml` обновлён с реальным program ID
+- `constants.ts` (фронтенд) и `.env.example` (бэкенд) обновлены
+- CI pipeline добавлен (`.github/workflows/programs-ci.yml` — запускает `anchor build && anchor test`)
+- `mollusk-svm` и `litesvm` убраны из dev-deps (конфликт Solana 2.2.x / 2.1.x)
+
+**Осталось:**
+- Проверить что `anchor build` проходит локально (CI мог ещё не запускаться)
+- Запустить `anchor test` — юнит-тесты должны пройти
 - Задеплоить на devnet: `anchor deploy --provider.cluster devnet`
-- Зафиксировать задеплоенный program ID для конфигов бэкенда/фронта
+- Подтвердить что программа видна в devnet explorer
 
 **Файлы:**
-- `programs/sol-sensor/src/lib.rs`
-- `programs/Anchor.toml`
-- `backend/.env.example` (обновить PROGRAM_ID)
-- `frontend/src/lib/constants.ts` (обновить PROGRAM_ID)
+- `programs/` (билд + деплой)
 
 ---
 
@@ -107,19 +85,25 @@
 
 **Приоритет:** Основной продуктовый флоу — 402 → pay → verify → consume → data.
 
+**Важно:** Лейаут `QueryReceipt` изменился (добавлены `pool_share` + `total_supply_at_payment`
+после `amount`). Бэкенд `decodeQueryReceipt` должен быть обновлён под новый 114-байтный лейаут.
+
 **Проблема:** Бэкенд имеет HTTP 402 гейт и верификацию рецептов, но:
 - 402 challenge использует плейсхолдерные адреса (не реальные PDA)
 - `consume_receipt` никогда не вызывается после отдачи данных (co-signer загружен, но не используется)
 - `sensor_id` рецепта не валидируется против запрошенного сенсора
 - Нет проверки дискриминатора и длины при декодировании данных рецепта
+- Бинарный декодер рассчитан на старый 98-байтный лейаут — **устарел** после добавления 2 полей в `QueryReceipt`
 
 **Скоуп:**
+- **Обновить `decodeQueryReceipt`** под новый лейаут:
+  `[0..8] disc, [8..40] sensor_id, [40..72] payer, [72..80] amount, [80..88] pool_share, [88..96] total_supply_at_payment, [96] consumed, [97..105] created_at, [105..113] expiry_slot, [113] bump`
 - Заменить `derivePoolAddress()` / `deriveVaultAddress()` на реальный PDA derivation
   через program ID + seeds (`["pool"]` и т.д.) через `@solana/kit`
 - Подставить `hardwareOwner` из он-чейн `HardwareEntry` или конфига
 - После возврата данных сенсора — собрать + подписать + отправить `consume_receipt` tx через co-signer
 - В `receiptVerifier` — сравнивать `receipt.sensor_id` с pubkey запрошенного сенсора
-- Добавить проверку 8-байтного дискриминатора и `data.length >= 98` в `decodeQueryReceipt`
+- Добавить проверку 8-байтного дискриминатора и `data.length >= 114` в `decodeQueryReceipt`
 - Добавить корректные error response если consume фейлится (логировать, но не блокировать отдачу данных)
 
 **Файлы:**
@@ -193,20 +177,21 @@
 
 **Приоритет:** Уверенность перед демо.
 
-**Скоуп:**
-- Реализовать `flow_tests.rs` (сейчас 4 заглушки с `#[ignore]`):
-  - `test_full_query_lifecycle`: init → register → pay → consume → claim
-  - `test_receipt_expiry_refund`: pay → warp → refund
-  - `test_transfer_hook_settles_rewards`: transfer триггерит hook
-  - `test_supply_cap_enforcement`: register до капа → фейл
-- Требуется собранный `.so` (зависит от задачи 3)
-- Опционально: E2E smoke test скрипт (curl или TypeScript) который бьёт по реальному
-  бэкенду на devnet
+**Блокер:** `litesvm >= 0.5` требует Solana 2.2.x, что конфликтует с
+`anchor-lang 0.32.x` (Solana 2.1.x). LiteSVM и mollusk-svm убраны из
+dev-зависимостей. Flow-тесты остаются заглушками.
+
+**Пересмотренный скоуп:**
+- ~~Реализовать `flow_tests.rs` через litesvm~~ Отложено — конфликт версий
+- **Альтернатива A:** Написать TypeScript E2E smoke test который бьёт по реальной программе
+  на devnet (через `@solana/kit` — отправка реальных tx, проверка стейта)
+- **Альтернатива B:** Дождаться совместимости Anchor 0.33.x / Solana 2.2.x и вернуть litesvm
+- **Альтернатива C:** Использовать `solana-program-test` (BanksClient) если совместим с 2.1.x
+- Минимум: убедиться что `anchor test` (юнит-тесты) проходит в CI
 
 **Файлы:**
-- `programs/sol-sensor/tests/flow_tests.rs`
-- `programs/sol-sensor/tests/fixtures/accounts.rs`
-- Опционально новый: `scripts/e2e-smoke.ts`
+- Новый: `scripts/e2e-smoke.ts` (предпочтительная альтернатива)
+- `programs/sol-sensor/tests/flow_tests.rs` (сохранён как документация намерений)
 
 ---
 
@@ -229,25 +214,24 @@
 
 ---
 
-## Порядок выполнения (4 дня)
+## Порядок выполнения (3 оставшихся дня)
 
 ```
-День 1:  complete-initialize-pool → fix-refund-accumulator → program-build-deploy
-День 2:  devnet-bootstrap-script → backend-payment-flow
-День 3:  frontend-wallet-verification → frontend-chain-integration
-День 4:  integration-tests → ui-polish → буфер
+День 2 (сегодня): program-build-deploy → devnet-bootstrap-script → backend-payment-flow
+День 3:           frontend-wallet-verification → frontend-chain-integration
+День 4:           integration-tests → ui-polish → буфер
 ```
 
 ## Краткая сводка
 
-| # | Имя изменения                  | Компонент | Оценка      |
-|---|-------------------------------|-----------|-------------|
-| 1 | `complete-initialize-pool`    | program   | Большая     |
-| 2 | `fix-refund-accumulator`      | program   | Средняя     |
-| 3 | `program-build-deploy`        | program   | Средняя     |
-| 4 | `devnet-bootstrap-script`     | scripts   | Средняя     |
-| 5 | `backend-payment-flow`        | backend   | Большая     |
-| 6 | `frontend-wallet-verification`| frontend  | Маленькая   |
-| 7 | `frontend-chain-integration`  | frontend  | Большая     |
-| 8 | `integration-tests`           | program   | Средняя     |
-| 9 | `ui-polish`                   | все       | Маленькая   |
+| # | Имя изменения                  | Компонент | Статус      | Оценка      |
+|---|-------------------------------|-----------|-------------|-------------|
+| 1 | `complete-initialize-pool`    | program   | ГОТОВО      | ~~Большая~~ |
+| 2 | `fix-refund-accumulator`      | program   | ГОТОВО      | ~~Средняя~~ |
+| 3 | `program-build-deploy`        | program   | Частично    | Маленькая   |
+| 4 | `devnet-bootstrap-script`     | scripts   | TODO        | Средняя     |
+| 5 | `backend-payment-flow`        | backend   | TODO        | Большая     |
+| 6 | `frontend-wallet-verification`| frontend  | TODO        | Маленькая   |
+| 7 | `frontend-chain-integration`  | frontend  | TODO        | Большая     |
+| 8 | `integration-tests`           | program   | Заблокирован| Средняя     |
+| 9 | `ui-polish`                   | все       | TODO        | Маленькая   |
