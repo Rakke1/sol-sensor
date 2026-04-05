@@ -9,9 +9,13 @@ let sensorKeypair: nacl.SignKeyPair;
 function getSensorKeypair(): nacl.SignKeyPair {
   if (sensorKeypair) return sensorKeypair;
 
-  const stored = loadKeypairBytes(SENSOR_KEYPAIR_PATH);
-  if (stored && stored.length === 64) {
-    sensorKeypair = nacl.sign.keyPair.fromSecretKey(stored);
+  const stored = loadKeypairBytes('SENSOR_KEY_JSON', SENSOR_KEYPAIR_PATH);
+  if (stored && (stored.length === 64 || stored.length === 32)) {
+    if (stored.length === 32) {
+      sensorKeypair = nacl.sign.keyPair.fromSeed(stored);
+    } else {
+      sensorKeypair = nacl.sign.keyPair.fromSecretKey(stored);
+    }
   } else {
     console.warn(
       '[SensorSimulator] Keypair file not found or invalid — generating ephemeral keypair.',

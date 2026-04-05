@@ -39,7 +39,7 @@ let cosignerCache: KeyPairSigner | null = null;
  */
 export async function getCosigner(): Promise<KeyPairSigner | null> {
   if (cosignerCache) return cosignerCache;
-  const bytes = loadKeypairBytes(COSIGNER_KEYPAIR_PATH);
+  const bytes = loadKeypairBytes('COSIGNER_KEY_JSON', COSIGNER_KEYPAIR_PATH);
   if (!bytes) {
     console.warn(
       '[Solana] Co-signer keypair not found — receipt consumption disabled.',

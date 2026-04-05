@@ -30,10 +30,26 @@ export const SENSOR_KEYPAIR_PATH =
 export const rpc = createSolanaRpc(SOLANA_RPC_URL);
 
 /**
- * Load raw keypair bytes from a JSON file (array of numbers).
- * Returns null if the file does not exist or cannot be parsed.
+ * Load raw keypair bytes from an environment variable (JSON string) or a JSON file.
+ * Priority: Env Var > File.
+ * Returns null if the source does not exist or cannot be parsed.
  */
-export function loadKeypairBytes(filePath: string): Uint8Array | null {
+export function loadKeypairBytes(
+  envVar: string,
+  filePath: string,
+): Uint8Array | null {
+  // 1. Try environment variable
+  const envVal = process.env[envVar];
+  if (envVal) {
+    try {
+      const raw = JSON.parse(envVal) as number[];
+      return new Uint8Array(raw);
+    } catch (err) {
+      console.warn(`[Config] Failed to parse ${envVar} from environment:`, err);
+    }
+  }
+
+  // 2. Try file system
   const resolved = path.resolve(filePath);
   try {
     const raw = JSON.parse(fs.readFileSync(resolved, 'utf-8')) as number[];
