@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import ContributorDashboard from '@/components/ContributorDashboard';
 import EconomicsPlayground from '@/components/EconomicsPlayground';
 import ClientSimulator from '@/components/ClientSimulator';
+import WalletModal from '@/components/WalletModal';
 import { useWallet } from './providers';
 
 type View = 'dashboard' | 'economics' | 'simulator';
@@ -16,7 +17,11 @@ const NAV_ITEMS: { id: View; label: string; icon: string }[] = [
 
 export default function Home() {
   const [view, setView] = useState<View>('dashboard');
+  const [modalOpen, setModalOpen] = useState(false);
   const { walletAddress, solBalance, connected, networkMismatch, walletError, connect, disconnect } = useWallet();
+
+  const openModal = useCallback(() => setModalOpen(true), []);
+  const closeModal = useCallback(() => setModalOpen(false), []);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -48,19 +53,12 @@ export default function Home() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
-              {walletError && (
-                <span className="text-xs text-amber-400 max-w-[200px] truncate">
-                  {walletError}
-                </span>
-              )}
-              <button
-                onClick={connect}
-                className="rounded-lg bg-[#14F195] px-4 py-1.5 text-sm font-semibold text-black hover:opacity-90 transition-opacity"
-              >
-                Connect Wallet
-              </button>
-            </div>
+            <button
+              onClick={openModal}
+              className="rounded-lg bg-[#14F195] px-4 py-1.5 text-sm font-semibold text-black hover:opacity-90 transition-opacity"
+            >
+              Connect Wallet
+            </button>
           )}
         </div>
       </header>
@@ -113,13 +111,20 @@ export default function Home() {
           {view === 'dashboard' && (
             <ContributorDashboard
               walletAddress={walletAddress}
-              onConnect={connect}
+              onConnect={openModal}
             />
           )}
           {view === 'economics' && <EconomicsPlayground />}
           {view === 'simulator' && <ClientSimulator />}
         </main>
       </div>
+
+      <WalletModal
+        open={modalOpen}
+        onClose={closeModal}
+        onConnect={connect}
+        error={walletError}
+      />
     </div>
   );
 }

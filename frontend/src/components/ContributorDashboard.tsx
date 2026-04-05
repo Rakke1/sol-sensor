@@ -89,14 +89,6 @@ export default function ContributorDashboard({
             Manage your SLSN position and claim rewards
           </p>
         </div>
-        {!walletAddress && (
-          <button
-            onClick={onConnect}
-            className="rounded-lg bg-[#14F195] px-4 py-2 text-sm font-semibold text-black hover:opacity-90 transition-opacity"
-          >
-            Connect Wallet
-          </button>
-        )}
       </div>
 
       {/* Your Position */}
