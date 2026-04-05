@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { useFaucetOnWalletConnect } from '@/hooks/useFaucetOnWalletConnect';
 import { address as toAddress } from '@solana/kit';
 import { SOLANA_NETWORK } from '@/lib/constants';
 import { rpc } from '@/lib/rpc';
@@ -59,6 +60,7 @@ async function checkNetworkMismatch(): Promise<boolean> {
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  useFaucetOnWalletConnect(walletAddress);
   const [solBalance, setSolBalance] = useState<number | null>(null);
   const [networkMismatch, setNetworkMismatch] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
