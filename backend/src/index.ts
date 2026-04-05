@@ -3,6 +3,7 @@ import cors from 'cors';
 import { PORT, CORS_ORIGIN } from './config';
 import healthRouter from './routes/health';
 import sensorsRouter from './routes/sensors';
+import faucetRouter from './routes/faucet';
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/sensors', sensorsRouter);
+app.use('/api/v1/faucet', faucetRouter);
 
 const globalErrorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error('[SolSensor] Unhandled error:', err);
