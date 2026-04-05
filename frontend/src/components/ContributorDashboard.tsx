@@ -131,7 +131,7 @@ export default function ContributorDashboard({
             >
               {claiming ? 'Claiming…' : 'Claim Rewards'}
             </button>
-            <InitContributor walletAddress={walletAddress} />
+            <InitContributor walletAddress={walletAddress} alreadyInitialised={!!contributor} onSuccess={refetchContrib} />
           </div>
           {claimError && (
             <p className="text-xs text-red-400 mt-2">{claimError}</p>

@@ -8,16 +8,22 @@ import { deriveSensorPool, deriveContributorState } from '@/lib/pda';
 
 interface InitContributorProps {
   walletAddress: string | null;
+  alreadyInitialised?: boolean;
   onSuccess?: () => void;
 }
 
 export default function InitContributor({
   walletAddress,
+  alreadyInitialised,
   onSuccess,
 }: InitContributorProps) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (!walletAddress || alreadyInitialised || done) {
+    return null;
+  }
 
   async function handleInit() {
     if (!walletAddress) {
@@ -44,29 +50,14 @@ export default function InitContributor({
       const msg = err instanceof Error ? err.message : 'Transaction failed';
       if (msg.includes('User rejected')) {
         setError('Transaction rejected by user');
+      } else if (msg.includes('0x0') || msg.includes('already in use')) {
+        setError('Account already initialised');
       } else {
         setError(msg);
       }
     } finally {
       setLoading(false);
     }
-  }
-
-  if (!walletAddress) {
-    return (
-      <button
-        disabled
-        className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-500 cursor-not-allowed"
-      >
-        Init Contributor Account
-      </button>
-    );
-  }
-
-  if (done) {
-    return (
-      <span className="text-sm text-green-400">✓ Contributor account initialised</span>
-    );
   }
 
   return (
