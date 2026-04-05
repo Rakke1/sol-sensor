@@ -1,0 +1,5 @@
+# Ignore coverage output
+/coverage
+/coverage-final.json
+/lcov-report/
+/.nyc_output/

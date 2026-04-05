@@ -1,7 +1,8 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/TypeScript-Express.js-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
-  <img src="https://img.shields.io/badge/HTTP-402%20Payments-4a9eff?style=for-the-badge" alt="HTTP 402"/>
-  <img src="https://img.shields.io/badge/Solana-Kit-14F195?style=for-the-badge&logo=solana&logoColor=white" alt="Solana Kit"/>
+  <img height=20 src="https://img.shields.io/badge/coverage-91%25-brightgreen" alt="Coverage"/>
+  <img height=20 src="https://img.shields.io/badge/TypeScript-Express.js-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
+  <img height=20 src="https://img.shields.io/badge/HTTP-402%20Payments-4a9eff?style=for-the-badge" alt="HTTP 402"/>
+  <img height=20 src="https://img.shields.io/badge/Solana-Kit-14F195?style=for-the-badge&logo=solana&logoColor=white" alt="Solana Kit"/>
 </p>
 
 # SolSensor — Backend API

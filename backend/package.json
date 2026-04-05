@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
     "test": "jest --passWithNoTests",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage && node update-coverage-badge.js"
   },
   "dependencies": {
     "@solana/kit": "^6.6.0",
