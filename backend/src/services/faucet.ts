@@ -122,7 +122,7 @@ interface MintResult {
 /**
  * Check wallet USDC balance and mint 100 USDC if below 10 USDC threshold.
  */
-export async function mintUsdcToWallet(walletAddressStr: string): Promise<MintResult> {
+export async function mintUsdcToWallet(walletAddressStr: string, injectedRpc?: typeof rpc): Promise<MintResult> {
   const walletAddress = address(walletAddressStr);
 
   // Check balance
@@ -149,7 +149,8 @@ export async function mintUsdcToWallet(walletAddressStr: string): Promise<MintRe
 
   // Send transaction
   try {
-    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+    const rpcToUse = injectedRpc || rpc;
+    const { value: latestBlockhash } = await rpcToUse.getLatestBlockhash().send();
     const msg = pipe(
       createTransactionMessage({ version: 0 }),
       (m) => setTransactionMessageFeePayerSigner(mintAuthority, m),
@@ -162,7 +163,7 @@ export async function mintUsdcToWallet(walletAddressStr: string): Promise<MintRe
     const wireBytes = txEncoder.encode(signedTx);
     const base64Tx = Buffer.from(wireBytes).toString('base64');
 
-    await rpc
+    await rpcToUse
       .sendTransaction(base64Tx as Parameters<typeof rpc.sendTransaction>[0], {
         encoding: 'base64',
         skipPreflight: false,

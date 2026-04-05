@@ -22,7 +22,7 @@ import type {
   AccountSignerMeta,
   Signature,
 } from '@solana/kit';
-import { rpc, COSIGNER_KEYPAIR_PATH, PROGRAM_ID, loadKeypairBytes } from '../config';
+import { rpc as defaultRpc, COSIGNER_KEYPAIR_PATH, PROGRAM_ID, loadKeypairBytes } from '../config';
 import { deriveGlobalState, deriveReceiptPda } from './pda';
 import { encodeBase58 } from '../utils/base58';
 
@@ -31,6 +31,18 @@ export { encodeBase58 };
 
 /** Lazy-loaded co-signer keypair. */
 let cosignerCache: KeyPairSigner | null = null;
+
+
+/**
+ * Allow dependency injection of the rpc object for testing.
+ */
+let injectedRpc: typeof defaultRpc | null = null;
+export function setSolanaRpc(rpcObj: typeof defaultRpc | null) {
+  injectedRpc = rpcObj;
+}
+function getRpc() {
+  return injectedRpc || defaultRpc;
+}
 
 /**
  * Load (or return cached) co-signer KeyPairSigner.
@@ -57,7 +69,7 @@ export async function getCosigner(): Promise<KeyPairSigner | null> {
  */
 export async function fetchReceipt(receiptPda: string): Promise<Uint8Array> {
   const receiptAddress: Address = address(receiptPda);
-  const account = await fetchEncodedAccount(rpc, receiptAddress);
+  const account = await fetchEncodedAccount(getRpc(), receiptAddress);
   assertAccountExists(account);
   return account.data as Uint8Array;
 }
@@ -181,18 +193,16 @@ export async function sendConsumeReceipt(
   nonce: Uint8Array,
   payerAddressStr: string,
 ): Promise<void> {
+  const rpc = getRpc();
   try {
     const cosigner = await getCosigner();
     if (!cosigner) {
       console.warn('[Consume] Skipped — no co-signer keypair loaded');
-
       return;
     }
-
     const globalState = await deriveGlobalState();
     const receiptAddr = address(receiptPdaStr);
     const payerAddr = address(payerAddressStr);
-
     const ix = buildConsumeReceiptIx(
       cosigner,
       globalState,
@@ -200,7 +210,6 @@ export async function sendConsumeReceipt(
       payerAddr,
       nonce,
     );
-
     const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
     const msg = pipe(
       createTransactionMessage({ version: 0 }),
@@ -208,19 +217,16 @@ export async function sendConsumeReceipt(
       (m) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
       (m) => appendTransactionMessageInstructions([ix], m),
     );
-
     const signedTx = await signTransactionMessageWithSigners(msg);
     const sig: Signature = getSignatureFromTransaction(signedTx);
     const wireBytes = txEncoder.encode(signedTx);
     const base64Tx = Buffer.from(wireBytes).toString('base64');
-
     await rpc
       .sendTransaction(base64Tx as Parameters<typeof rpc.sendTransaction>[0], {
         encoding: 'base64',
         skipPreflight: false,
       } as Parameters<typeof rpc.sendTransaction>[1])
       .send();
-
     console.log(`[Consume] Receipt consumed: ${receiptPdaStr} (sig: ${sig})`);
   } catch (err) {
     console.warn(`[Consume] Failed to consume receipt ${receiptPdaStr}:`, err);

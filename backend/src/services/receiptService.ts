@@ -18,6 +18,7 @@ export interface ReceiptValidationResult {
 export async function validateReceipt(
   receiptPda: string,
   expectedSensorId?: string,
+  injectedRpc?: typeof rpc
 ): Promise<ReceiptValidationResult> {
   let data: Uint8Array;
   try {
@@ -38,7 +39,8 @@ export async function validateReceipt(
   }
 
   try {
-    const slotResponse = await rpc.getSlot({ commitment: 'confirmed' }).send();
+    const rpcToUse = injectedRpc || rpc;
+    const slotResponse = await rpcToUse.getSlot({ commitment: 'confirmed' }).send();
     const currentSlot = BigInt(slotResponse);
     if (receipt.expirySlot < currentSlot) {
       return {
