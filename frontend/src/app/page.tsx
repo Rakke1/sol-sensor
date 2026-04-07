@@ -9,10 +9,13 @@ import { useWallet } from './providers';
 
 type View = 'dashboard' | 'economics' | 'simulator';
 
-const NAV_ITEMS: { id: View; label: string; icon: string }[] = [
-  { id: 'dashboard', label: 'Contributor Dashboard', icon: '🌐' },
-  { id: 'economics', label: 'Unit Economics', icon: '📊' },
-  { id: 'simulator', label: 'Client Simulator', icon: '🤖' },
+
+import { DashboardIcon, EconomicsIcon, SimulatorIcon } from '@/components/NavIcons';
+
+const NAV_ITEMS: { id: View; label: string; icon: React.ReactNode }[] = [
+  { id: 'dashboard', label: 'Contributor Dashboard', icon: DashboardIcon },
+  { id: 'economics', label: 'Unit Economics', icon: EconomicsIcon },
+  { id: 'simulator', label: 'Client Simulator', icon: SimulatorIcon },
 ];
 
 export default function Home() {
