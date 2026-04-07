@@ -7,10 +7,16 @@
   <img height=25 src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="MIT License"/>
 </p>
 
+<p align="center">
+  <a href="https://sol-sensor.onrender.com/" target="_blank" style="font-size:1.2em;font-weight:bold;">
+    🚀 <b>Live Demo: sol-sensor.onrender.com</b> ➔
+  </a>
+</p>
+
 
 # SolSensor
 
-**Tokenized IoT Sensor Pools × HTTP 402 Machine-to-Machine Micro-Payments on Solana**
+**Tokenized IoT Sensor Pools**
 
 > A DePIN protocol that pools real-world air quality sensors into a single tokenized network, then monetizes their data through HTTP 402 micro-payments — with atomic on-chain revenue splitting and trustless reward distribution.
 
