@@ -3,6 +3,22 @@ import { SENSOR_KEYPAIR_PATH, loadKeypairBytes } from '../config';
 import { encodeBase58 } from '../utils/base58';
 import type { SensorData, DataProof, SensorResponse } from '../types';
 
+interface DemoSensor {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+}
+
+/** Demo sensor stations clustered in Almaty, Kazakhstan */
+export const DEMO_SENSORS: DemoSensor[] = [
+  { id: 'almaty-1', name: 'Downtown Center', lat: 43.238, lng: 76.945 },
+  { id: 'almaty-2', name: 'Bostandyk District', lat: 43.27, lng: 76.917 },
+  { id: 'almaty-3', name: 'Medeu Canyon', lat: 43.209, lng: 76.97 },
+  { id: 'almaty-4', name: 'Alatau Foothills', lat: 43.19, lng: 76.93 },
+  { id: 'almaty-5', name: 'Auezov Area', lat: 43.255, lng: 76.9 },
+];
+
 /** Sensor keypair — generated once at startup. */
 let sensorKeypair: nacl.SignKeyPair;
 
@@ -42,7 +58,7 @@ function generateAqiData(): Omit<
  * Simulate a signed AQI sensor reading.
  * Signs the canonical JSON of the data payload using Ed25519.
  */
-export function simulateSensorReading(sensorType: string): SensorResponse {
+export function simulateSensorReading(sensorType: string, sensorId?: string): SensorResponse {
   const keypair = getSensorKeypair();
   const timestamp = Math.floor(Date.now() / 1000);
 
@@ -54,10 +70,13 @@ export function simulateSensorReading(sensorType: string): SensorResponse {
     );
   }
 
+  // Look up sensor location by ID, default to almaty-1
+  const sensor = DEMO_SENSORS.find((s) => s.id === sensorId) || DEMO_SENSORS[0];
+
   data = {
     sensorType: 'AQI',
     timestamp,
-    location: { lat: 43.238, lng: 76.945 },
+    location: { lat: sensor.lat, lng: sensor.lng },
     ...generateAqiData(),
   };
 

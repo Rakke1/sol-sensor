@@ -22,8 +22,9 @@ router.get(
   receiptVerifier,
   (req, res) => {
     const { sensorType } = req.params;
+    const { sensor: sensorId } = req.query;
     try {
-      const response = simulateSensorReading(sensorType);
+      const response = simulateSensorReading(sensorType, sensorId as string | undefined);
       res.status(200).json(response);
 
       const receipt = res.locals['receipt'] as QueryReceiptData | undefined;

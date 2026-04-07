@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
 import type { DemoState, PaymentChallenge, SensorResponse } from '@/types';
+import { DEMO_SENSORS } from '@/types';
 import type { Address } from '@solana/kit';
 import { API_URL, QUERY_PRICE_MICRO_USDC } from '@/lib/constants';
 import { verifySensorSignature } from '@/lib/verify';
@@ -9,6 +11,9 @@ import { deriveReceiptPda, deriveAta } from '@/lib/pda';
 import { buildPayForQueryIx } from '@/lib/program';
 import { signAndSendTransaction } from '@/lib/tx';
 import { useWallet } from '@/app/providers';
+
+// Dynamically import SensorMap to avoid SSR issues with Leaflet
+const SensorMap = dynamic(() => import('./SensorMap'), { ssr: false });
 
 const INITIAL_STATE: DemoState = {
   step: 'idle',
@@ -73,7 +78,10 @@ function StepRow({
 
 export default function ClientSimulator() {
   const [demo, setDemo] = useState<DemoState>(INITIAL_STATE);
+  const [selectedSensorId, setSelectedSensorId] = useState('almaty-1');
   const { walletAddress, connected } = useWallet();
+
+  const selectedSensor = DEMO_SENSORS.find((s) => s.id === selectedSensorId) || DEMO_SENSORS[0];
 
   function patch(partial: Partial<DemoState>) {
     setDemo((d) => ({ ...d, ...partial }));
@@ -94,7 +102,7 @@ export default function ClientSimulator() {
 
     try {
       // Step 1: Request data → receive HTTP 402
-      const res1 = await fetch(`${API_URL}/api/v1/sensors/AQI`);
+      const res1 = await fetch(`${API_URL}/api/v1/sensors/AQI?sensor=${selectedSensorId}`);
       let challenge: PaymentChallenge | null = null;
 
       if (res1.status === 402) {
@@ -155,7 +163,7 @@ export default function ClientSimulator() {
       });
 
       // Step 3: Fetch signed sensor data with receipt + nonce headers
-      const res2 = await fetch(`${API_URL}/api/v1/sensors/AQI`, {
+      const res2 = await fetch(`${API_URL}/api/v1/sensors/AQI?sensor=${selectedSensorId}`, {
         headers: {
           'x-query-receipt': receiptPda,
           'x-query-nonce': nonceB64,
@@ -197,7 +205,8 @@ export default function ClientSimulator() {
         <div>
           <h2 className="text-2xl font-bold text-white">Enterprise Client Simulator</h2>
           <p className="text-slate-400 text-sm mt-1">
-            End-to-end HTTP 402 payment flow — real on-chain transactions
+            End-to-end HTTP 402 payment flow from{' '}
+            <span className="text-[#14F195] font-semibold">{selectedSensor.name}</span> — real on-chain transactions
           </p>
         </div>
         <button
@@ -207,6 +216,16 @@ export default function ClientSimulator() {
         >
           {step === 'idle' || isDone || isError ? '▶ Run Full Demo' : 'Running…'}
         </button>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-white mb-3">Select a Sensor Station</h3>
+        <SensorMap
+          sensors={DEMO_SENSORS}
+          selectedId={selectedSensorId}
+          onSelect={setSelectedSensorId}
+          disabled={step !== 'idle' && !isDone && !isError}
+        />
       </div>
 
       <div className="space-y-3">

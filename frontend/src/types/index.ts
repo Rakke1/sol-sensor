@@ -1,3 +1,5 @@
+export { type DemoSensor, DEMO_SENSORS } from '@/lib/sensors';
+
 export interface SensorPool {
   totalSupply: bigint;
   maxSupply: bigint;
