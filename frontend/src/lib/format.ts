@@ -43,9 +43,13 @@ export function formatSupplyPct(
     return '100.0';
   }
 
-  const scaled = (totalSupply * 1000n) / maxSupply;
-  const whole = scaled / 10n;
-  const frac = scaled % 10n;
+  // Scale by 1,000,000 to get 4 decimal places of precision (0.0001%)
+  const scaled = (totalSupply * 1_000_000n) / maxSupply;
+  const whole = scaled / 10_000n;
+  const frac = scaled % 10_000n;
 
-  return `${whole}.${frac}`;
+  // Pad to 4 decimals and strip trailing zeros
+  const fracStr = frac.toString().padStart(4, '0').replace(/0+$/, '');
+  
+  return fracStr ? `${whole}.${fracStr}` : whole.toString();
 }
