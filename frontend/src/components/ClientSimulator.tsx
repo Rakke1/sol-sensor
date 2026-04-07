@@ -211,7 +211,7 @@ export default function ClientSimulator() {
         </div>
         <button
           onClick={runDemo}
-          disabled={step !== 'idle' && !isDone && !isError}
+          disabled={(!connected) || (step !== 'idle' && !isDone && !isError)}
           className="shrink-0 rounded-lg bg-[#14F195] px-5 py-2 text-sm font-semibold text-black hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {step === 'idle' || isDone || isError ? '▶ Run Full Demo' : 'Running…'}
